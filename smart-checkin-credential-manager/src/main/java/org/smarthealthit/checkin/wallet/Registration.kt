@@ -8,6 +8,7 @@ import androidx.credentials.registry.provider.ClearCredentialRegistryRequest
 import androidx.credentials.registry.provider.RegisterCredentialsRequest
 import androidx.credentials.registry.provider.RegistryManager
 import androidx.credentials.registry.provider.digitalcredentials.DigitalCredentialRegistry
+import org.smarthealthit.checkin.wallet.credentialmanager.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -20,7 +21,7 @@ import org.json.JSONObject
  *     (consumed at match time by the WASM matcher);
  *   - matcherBytes: the WASM matcher from `../matcher/`.
  */
-internal object Registration {
+object Registration {
     private const val TAG = "SHCRegistration"
     const val PROTOCOL = "org-iso-mdoc"
     const val REGISTRATION_ID = "smart-health-checkin-org-iso-mdoc"
@@ -100,7 +101,7 @@ internal object Registration {
     }
 }
 
-internal sealed interface RegistrationResult {
+sealed interface RegistrationResult {
     data class Success(
         val matcherBytes: Int,
         val credentialsBytes: Int,

@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets
  * Just enough to walk an mdoc DeviceRequest emitted by Chrome / Safari for the
  * `org-iso-mdoc` Digital Credentials API protocol and to emit the demo
  * DeviceResponse bytes — see
- * `profiles/org-iso-mdoc.md` for the captured shape.
+ * `docs/profiles/org-iso-mdoc.md` for the captured shape.
  *
  * Supports: unsigned integers (0..2^32-1), negative integers, byte strings,
  * text strings, arrays, maps, tags, booleans, and null.
@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets
  * unsupported — Chrome / Safari use definite, 32-bit-or-shorter forms in
  * captured requests.
  */
-internal object MdocCbor {
+object MdocCbor {
     /** CBOR tag 24 — RFC 8949 §3.4.5.1 — "Encoded CBOR data item". */
     const val TAG_ENCODED_CBOR: Long = 24
 
@@ -200,7 +200,7 @@ internal object MdocCbor {
  *   ItemsRequest = { docType, nameSpaces, requestInfo? }
  * We expect exactly one DocRequest with one ItemsRequest.
  */
-internal data class DecodedItemsRequest(
+data class DecodedItemsRequest(
     val docType: String,
     val namespaces: Map<String, Map<String, Boolean>>,
     val smartRequestJson: JSONObject?,
@@ -208,7 +208,7 @@ internal data class DecodedItemsRequest(
     val readerAuthBytes: ByteArray?,
 )
 
-internal object DeviceRequestParser {
+object DeviceRequestParser {
     private const val EXPECTED_DOC_TYPE = "org.smarthealthit.checkin.1"
     private const val EXPECTED_NAMESPACE = "org.smarthealthit.checkin"
     private const val SMART_REQUEST_INFO_KEY = "org.smarthealthit.checkin.request"

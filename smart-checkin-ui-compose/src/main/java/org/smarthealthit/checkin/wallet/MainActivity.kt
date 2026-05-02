@@ -582,7 +582,7 @@ private fun HomeScreen(
 }
 
 @Composable
-internal fun DemoApp(
+fun DemoApp(
     state: ScreenState,
     selectedItems: SnapshotStateMap<String, Boolean>,
     questionnaireAnswers: SnapshotStateMap<String, Any>,
@@ -1571,7 +1571,7 @@ private fun DataGlyph(kind: RequestKind) {
 }
 
 @Composable
-internal fun SampleHealthTheme(content: @Composable () -> Unit) {
+fun SampleHealthTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = AppColors.Primary,
@@ -1678,46 +1678,13 @@ private fun jsonObjects(array: JSONArray?): List<JSONObject> {
     return values
 }
 
-internal sealed interface ScreenState {
+sealed interface ScreenState {
     data object Empty : ScreenState
     data class Loading(val title: String, val message: String) : ScreenState
     data class Consent(val request: VerifiedRequest) : ScreenState
     data class Submitting(val title: String, val message: String) : ScreenState
     data class Error(val message: String) : ScreenState
     data object Complete : ScreenState
-}
-
-internal data class VerifiedRequest(
-    val requestId: String = "",
-    val verifierOrigin: String,
-    val clientId: String,
-    val requestUri: String,
-    val responseUri: String,
-    val state: String,
-    val nonce: String,
-    val completion: String,
-    val clientMetadata: JSONObject,
-    val dcqlQuery: JSONObject,
-    val rawSmartRequestJson: String = "",
-    val readerAuth: ReaderAuthVerification = ReaderAuthVerification.ABSENT,
-    val items: List<RequestItem>,
-)
-
-internal data class RequestItem(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val kind: RequestKind,
-    val meta: JSONObject,
-    val acceptedMediaTypes: List<String> = listOf("application/fhir+json"),
-)
-
-internal enum class RequestKind {
-    Coverage,
-    Plan,
-    Clinical,
-    Questionnaire,
-    Unknown,
 }
 
 private enum class ChipTone {

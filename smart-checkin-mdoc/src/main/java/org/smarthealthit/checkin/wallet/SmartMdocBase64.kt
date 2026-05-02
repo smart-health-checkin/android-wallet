@@ -2,7 +2,7 @@ package org.smarthealthit.checkin.wallet
 
 import java.util.Base64
 
-internal object SmartMdocBase64 {
+object SmartMdocBase64 {
     fun encodeUrl(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 
     fun decodeUrl(value: String): ByteArray {

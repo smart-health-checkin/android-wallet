@@ -5,7 +5,7 @@ import java.security.KeyPair
 import java.time.Instant
 import org.json.JSONObject
 
-internal data class DirectMdocWalletResponse(
+data class DirectMdocWalletResponse(
     val credentialJson: String,
     val deviceResponseBytes: ByteArray,
     val dcapiResponseBytes: ByteArray,
@@ -18,7 +18,7 @@ internal data class DirectMdocWalletResponse(
     val deviceAuthenticationBytes: ByteArray,
 )
 
-internal data class MdocResponderTestMaterial(
+data class MdocResponderTestMaterial(
     val nowMillis: Long,
     val issuerKeyPair: KeyPair,
     val deviceKeyPair: KeyPair,
@@ -27,7 +27,8 @@ internal data class MdocResponderTestMaterial(
     val signatureRandom: SecureRandom,
 )
 
-internal object SmartHealthMdocResponder {
+object SmartHealthMdocResponder {
+    private const val PROTOCOL = "org-iso-mdoc"
     private const val DOC_TYPE = "org.smarthealthit.checkin.1"
     private const val NAMESPACE = "org.smarthealthit.checkin"
     private const val ELEMENT = "smart_health_checkin_response"
@@ -131,7 +132,7 @@ internal object SmartHealthMdocResponder {
             )
         )
         val credentialJson = JSONObject()
-            .put("protocol", Registration.PROTOCOL)
+            .put("protocol", PROTOCOL)
             .put("data", JSONObject().put("response", SmartMdocBase64.encodeUrl(dcapiResponseBytes)))
             .toString()
 

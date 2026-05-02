@@ -4,9 +4,9 @@ import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal fun smartQuestionnaireAnswerKey(credentialId: String, linkId: String): String = "$credentialId::$linkId"
+fun smartQuestionnaireAnswerKey(credentialId: String, linkId: String): String = "$credentialId::$linkId"
 
-internal object QuestionnaireResponseBuilder {
+object QuestionnaireResponseBuilder {
     fun build(
         requestItem: RequestItem,
         answerSnapshot: Map<String, Any>,
@@ -199,7 +199,7 @@ internal object QuestionnaireResponseBuilder {
     }
 }
 
-internal fun jsonObjectItems(array: JSONArray?): List<JSONObject> {
+fun jsonObjectItems(array: JSONArray?): List<JSONObject> {
     if (array == null) return emptyList()
     val values = ArrayList<JSONObject>(array.length())
     for (index in 0 until array.length()) {
@@ -208,7 +208,7 @@ internal fun jsonObjectItems(array: JSONArray?): List<JSONObject> {
     return values
 }
 
-internal fun jsonValue(value: Any?): Any? {
+fun jsonValue(value: Any?): Any? {
     return when (value) {
         null -> null
         is JSONObject -> JSONObject(value.toString())

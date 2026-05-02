@@ -36,7 +36,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
-internal object SmartMdocCrypto {
+object SmartMdocCrypto {
     private const val P256_SIZE = 32
     private const val HPKE_KEM_DHKEM_P256_HKDF_SHA256 = 0x0010
     private const val HPKE_KDF_HKDF_SHA256 = 0x0001

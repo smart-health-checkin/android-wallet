@@ -3,7 +3,7 @@ package org.smarthealthit.checkin.wallet
 import java.security.interfaces.ECPublicKey
 import org.json.JSONObject
 
-internal data class DirectMdocRequest(
+data class DirectMdocRequest(
     val origin: String,
     val protocol: String,
     val data: JSONObject,
@@ -17,27 +17,13 @@ internal data class DirectMdocRequest(
     val readerAuth: ReaderAuthVerification,
 )
 
-internal data class DirectMdocEncryptionInfo(
+data class DirectMdocEncryptionInfo(
     val nonce: ByteArray,
     val recipientPublicKey: ECPublicKey,
     val recipientPublicKeyCose: Map<*, *>,
 )
 
-internal data class ReaderAuthVerification(
-    val present: Boolean,
-    val signatureValid: Boolean,
-    val certificateSubject: String?,
-) {
-    companion object {
-        val ABSENT = ReaderAuthVerification(
-            present = false,
-            signatureValid = false,
-            certificateSubject = null,
-        )
-    }
-}
-
-internal object DirectMdocRequestParser {
+object DirectMdocRequestParser {
     private const val PROTOCOL_ORG_ISO_MDOC = "org-iso-mdoc"
     private const val PROTOCOL_ORG_DOT_ISO_MDOC = "org.iso.mdoc"
 

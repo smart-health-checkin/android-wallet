@@ -8,7 +8,7 @@ import org.json.JSONObject
  * Health Check-in request JSON pulled out of
  * `requestInfo["org.smarthealthit.checkin.request"]`.
  */
-internal object SmartRequestAdapter {
+object SmartRequestAdapter {
     fun build(
         verifierOrigin: String,
         nonce: String,

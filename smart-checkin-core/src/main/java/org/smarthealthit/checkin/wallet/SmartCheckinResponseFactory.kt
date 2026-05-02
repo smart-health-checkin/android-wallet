@@ -3,7 +3,7 @@ package org.smarthealthit.checkin.wallet
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal object SmartCheckinResponseFactory {
+object SmartCheckinResponseFactory {
     fun build(
         request: VerifiedRequest,
         selectedItems: Map<String, Boolean>,
