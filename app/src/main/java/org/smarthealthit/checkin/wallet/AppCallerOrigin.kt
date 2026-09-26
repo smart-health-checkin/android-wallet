@@ -6,7 +6,7 @@ import java.util.Base64
 
 /**
  * The origin string for a native Android app that calls the wallet directly
- * (spec [TR-2]; platform notes, "Native apps as Verifiers"). Android reports no
+ * (spec [TR-2]; Platform notes, "Native Verifier apps"). Android reports no
  * web origin for such a caller, so the origin is
  * `android:apk-key-hash:` + base64url (no padding) SHA-256 of the DER-encoded
  * signing certificate. The calling app computes the same string for its own
