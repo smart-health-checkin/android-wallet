@@ -263,8 +263,8 @@ OpenID, or ISO specs. Measured on a Pixel 11 Pro XL / Android 17 / Chrome 151
 
 | Mode | When | Ceiling |
 | --- | --- | --- |
-| Intent-extra ("legacy") | wallet uses the deprecated two-argument `PendingIntentHandler.setGetCredentialResponse`, **or** the caller offered no large-payload receiver (Chrome < 150, other callers) | result-Intent parcel of ~514 KB passes, ~522 KB is **silently dropped** (picker stays open, the RP's promise never settles); ≥ ~1 MB the wallet crashes in `finish()`. Budget ≈ 200,000 chars of `credentialJson`. |
-| Large-payload | androidx ≥ 1.7.0-alpha01, the three-argument overload (what `HandlerActivity` uses), and a caller that put `EXTRA_LARGE_PAYLOAD_RESULT_RECEIVER` in the request (Chrome ≥ 150) | bundles ≥ 200 KB go out of band as a file descriptor; no transport limit found up to 66.7 M chars. The next wall is the wallet's own heap: ≈ 20 MB of payload at the default 256 MB, ≈ 50 MB with `largeHeap`, failing cleanly with an RP-visible `NetworkError`. |
+| Intent-extra ("legacy") | wallet uses the deprecated two-argument `PendingIntentHandler.setGetCredentialResponse`, **or** the caller offered no large-payload receiver (Chrome < 150, other callers) | result-Intent parcel of ~514 KB passes, ~522 KB is **silently dropped** (picker stays open, the Verifier's promise never settles); ≥ ~1 MB the wallet crashes in `finish()`. Budget ≈ 200,000 chars of `credentialJson`. |
+| Large-payload | androidx ≥ 1.7.0-alpha01, the three-argument overload (what `HandlerActivity` uses), and a caller that put `EXTRA_LARGE_PAYLOAD_RESULT_RECEIVER` in the request (Chrome ≥ 150) | bundles ≥ 200 KB go out of band as a file descriptor; no transport limit found up to 66.7 M chars. The next wall is the wallet's own heap: ≈ 20 MB of payload at the default 256 MB, ≈ 50 MB with `largeHeap`, failing cleanly with a Verifier-visible `NetworkError`. |
 
 **Detecting the mode in the app.** `ResponseDelivery.describe(request)` (in
 `smart-checkin-credential-manager`) reports whether the caller accepts large
