@@ -12,17 +12,17 @@
     "mdoc-verify": "Wallet side: verifiers check the mdoc layer."
   },
   "knownFailures": {
-    "request-json/version-number": "SmartRequestAdapter uses optString, so the number 1 reads as \"1\"",
-    "request-json/mixed-form-with-profiles": "SmartRequest.kt allows selection fields on form.fhir",
-    "request-json/mixed-selection-with-questionnaire": "SmartRequest.kt allows questionnaire fields on selection.fhir",
-    "request-json/canonical-not-string": "SmartRequest.kt coerces a number canonical to a string",
-    "request-json/profiles-from-string": "SmartRequest.kt accepts a bare string for profilesFrom",
-    "request-json/empty-profiles": "SmartRequest.kt accepts empty profiles[]",
-    "request-json/empty-resource-types": "SmartRequest.kt accepts empty resourceTypes[]",
-    "request-cbor/wrong-protocol": "DirectMdocRequest.kt also accepts protocol org.iso.mdoc",
-    "request-cbor/padded-base64url": "SmartMdocBase64 accepts padding",
+    "request-cbor/duplicate-key-items-request": "MdocCbor.decode keeps the last duplicate map key (D15)",
+    "request-cbor/encryption-key-wrong-curve": "SmartMdocCrypto.publicKeyFromCose doesn't check kty/crv",
     "request-cbor/intent-not-bool": "MdocCbor.kt coerces a non-boolean intentToRetain to false",
+    "request-cbor/padded-base64url": "SmartMdocBase64 accepts padding",
+    "request-cbor/two-smart-doc-requests": "MdocCbor.kt takes the first SMART DocRequest without counting them (WRQ-4)",
     "request-cbor/unknown-version": "MdocCbor.kt doesn't check DeviceRequest version",
-    "request-cbor/encryption-key-wrong-curve": "SmartMdocCrypto.publicKeyFromCose doesn't check kty/crv"
+    "request-cbor/wrong-protocol": "DirectMdocRequest.kt also accepts protocol org.iso.mdoc",
+    "request-json/blank-canonical": "SmartRequest.kt rejects the whole request; the item should be unsupported (SEL-10)",
+    "request-json/content-kind-not-string": "SmartRequest.kt coerces a numeric kind with optString instead of rejecting the request (REQ-2)",
+    "request-json/form-no-source": "SmartRequest.kt rejects the whole request; the item should be unsupported (FORM-1, REQ-2)",
+    "request-json/questionnaire-wrong-type": "SmartRequest.kt rejects the whole request; the item should be unsupported (FORM-1, REQ-2)",
+    "request-json/version-number": "SmartRequestAdapter uses optString, so the number 1 reads as \"1\""
   }
 }
