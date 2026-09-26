@@ -79,7 +79,7 @@ fn matches_smart_checkin_request_and_emits_entry() {
 #[test]
 fn matches_shared_ts_smart_checkin_fixture() {
     let mut api = Recorder {
-        request: project_fixture(&["fixtures", "dcapi-requests", "ts-smart-checkin-basic", "request.json"]),
+        request: project_fixture(&["fixtures", "dcapi-requests", "synthetic-basic", "request.json"]),
         credentials: fixture("credentials-blob.json"),
         entries: Vec::new(),
     };
@@ -91,7 +91,7 @@ fn matches_shared_ts_smart_checkin_fixture() {
 #[test]
 fn matches_escaped_request_json_wrapper() {
     let request_json = String::from_utf8(
-        project_fixture(&["fixtures", "dcapi-requests", "ts-smart-checkin-basic", "request.json"]),
+        project_fixture(&["fixtures", "dcapi-requests", "synthetic-basic", "request.json"]),
     )
     .expect("fixture is utf-8 JSON");
     let escaped = request_json.replace('\\', "\\\\").replace('"', "\\\"");

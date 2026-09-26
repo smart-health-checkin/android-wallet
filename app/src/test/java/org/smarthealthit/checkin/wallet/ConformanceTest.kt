@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The spec's conformance cases (github.com/smart-health-checkin/spec,
- * conformance/), fetched at a pinned ref by scripts/fetch-conformance.sh.
+ * conformance/), fetched at a pinned tag by scripts/fetch-spec.sh.
  * Every claimed case must pass except those in conformance/known-failures.json,
  * which must still fail: a listed case that passes fails this test until it is
  * removed from the list.

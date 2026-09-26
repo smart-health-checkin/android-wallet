@@ -4,11 +4,10 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
 [MAINTAINING.md](https://github.com/smart-health-checkin/smart-health-checkin.github.io/blob/main/MAINTAINING.md) maps every repo, what triggers what, and how to release.
 
 - Test: `./gradlew :app:testDebugUnitTest --no-daemon`. Test tasks fetch the
-  spec's fixtures at the pinned tag first (`scripts/fetch-fixtures.sh`,
-  `SPEC_FIXTURES_REF`).
+  spec's fixtures and conformance cases at the pinned tag first
+  (`scripts/fetch-spec.sh`, `SPEC_REF`; `SPEC_DIR=../spec` uses a local checkout).
 - Conformance: `ConformanceTest` runs the spec's conformance cases
-  (`request-json`, `request-cbor`, `transcript`, `wallet-response`; pinned by
-  `SPEC_CONFORMANCE_REF` in `scripts/fetch-conformance.sh`). Credentials built
+  (`request-json`, `request-cbor`, `transcript`, `wallet-response`). Credentials built
   for `wallet-response` land in `app/build/conformance-wallet/`, and CI checks
   them with `bun spec-conformance/reference/verify-wallet-output.ts
   app/build/conformance-wallet conformance/known-failures.json`.

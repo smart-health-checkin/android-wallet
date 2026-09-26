@@ -128,19 +128,14 @@ tasks.register("copyMatcherWasm", Copy) {
     }
 }
 
-// The spec's conformance fixtures, at the tag pinned in scripts/fetch-fixtures.sh.
-// Unit tests read them from ../fixtures.
-tasks.register("fetchFixtures", Exec) {
+// The spec's fixtures and conformance cases, at the tag pinned in
+// scripts/fetch-spec.sh. Unit tests read them from ../fixtures and ../spec-conformance.
+tasks.register("fetchSpec", Exec) {
     workingDir rootProject.projectDir
-    commandLine "bash", "scripts/fetch-fixtures.sh"
-}
-tasks.register("fetchConformance", Exec) {
-    workingDir rootProject.projectDir
-    commandLine "bash", "scripts/fetch-conformance.sh"
+    commandLine "bash", "scripts/fetch-spec.sh"
 }
 tasks.withType(Test).configureEach {
-    dependsOn "fetchFixtures"
-    dependsOn "fetchConformance"
+    dependsOn "fetchSpec"
     // The conformance cases are read from outside the source set; rerun when they change.
     inputs.dir(rootProject.file("spec-conformance")).withPropertyName("specConformance").optional()
     inputs.file(rootProject.file("conformance/known-failures.json")).withPropertyName("conformanceKnownFailures")

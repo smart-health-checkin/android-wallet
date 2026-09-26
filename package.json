@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vectors": "scripts/fetch-fixtures.sh && bun run app/src/test/resources/gen-test-vectors.ts",
+    "vectors": "scripts/fetch-spec.sh && bun run app/src/test/resources/gen-test-vectors.ts",
     "e2e:verifier-app": "bun tools/verifier-app-e2e/run.ts"
   },
   "dependencies": {

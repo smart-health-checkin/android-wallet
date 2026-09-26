@@ -47,7 +47,7 @@ class RequestFixtureParserTest {
             assertArrayEquals(sessionTranscript.readBytes(), parsed.sessionTranscriptBytes)
         }
 
-        if (id == "ts-smart-checkin-readerauth") {
+        if (id == "synthetic-reader-auth") {
             assertNotNull(parsed.itemsRequest.readerAuthBytes)
             assertTrue(parsed.readerAuth.present)
             assertTrue(parsed.readerAuth.signatureValid)
@@ -91,9 +91,9 @@ class RequestFixtureParserTest {
 
     private companion object {
         val POSITIVE_FIXTURES = listOf(
-            "ts-smart-checkin-basic",
-            "ts-smart-checkin-readerauth",
-            "real-chrome-android-smart-checkin",
+            "synthetic-basic",
+            "synthetic-reader-auth",
+            "android-chrome-capture",
         )
     }
 }

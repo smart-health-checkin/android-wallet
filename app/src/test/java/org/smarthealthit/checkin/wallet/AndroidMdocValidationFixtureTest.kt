@@ -10,8 +10,8 @@ import org.junit.Test
 class AndroidMdocValidationFixtureTest {
     @Test
     fun writesDeterministicResponseFixtureForRpWebValidation() {
-        val requestFixture = File("../fixtures/dcapi-requests/ts-smart-checkin-basic")
-        val outputDir = File("build/generated/mdoc-validation/ts-smart-checkin-basic")
+        val requestFixture = File("../fixtures/dcapi-requests/synthetic-basic")
+        val outputDir = File("build/generated/mdoc-validation/synthetic-basic")
         val requestMetadata = JSONObject(File(requestFixture, "metadata.json").readText())
         val parsedRequest = DirectMdocRequestParser.parseRequestJson(
             requestJson = File(requestFixture, "request.json").readText(),
@@ -52,7 +52,7 @@ class AndroidMdocValidationFixtureTest {
         File(outputDir, "smart-response.expected.json").writeText("${smartResponse.toString(2)}\n")
         File(outputDir, "metadata.json").writeText(
             JSONObject()
-                .put("sourceRequestFixture", "fixtures/dcapi-requests/ts-smart-checkin-basic")
+                .put("sourceRequestFixture", "fixtures/dcapi-requests/synthetic-basic")
                 .put("origin", requestMetadata.getString("origin"))
                 .put("nowMillis", TEST_NOW_MILLIS)
                 .toString(2) + "\n",
