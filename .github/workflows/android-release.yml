@@ -33,10 +33,21 @@ jobs:
         # nightly Rust toolchain isn't needed here. Rebuild it locally with
         # app/matcher-rs/build.sh when its source changes.
         run: |
-          VERSION_NAME="${GITHUB_REF_NAME#wallet-v}"
-          [ "$GITHUB_REF_TYPE" = tag ] || VERSION_NAME="0.1.${{ github.run_number }}-dev"
+          # versionCode must only ever grow, or installed wallets can't
+          # update. It comes from the version (0.3.5 -> 3005), not the run
+          # number, which restarted when this repo was split out of spec
+          # (whose releases reached versionCode 5). Untagged dev builds use
+          # the run number and stay below every release.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            VERSION_NAME="${GITHUB_REF_NAME#wallet-v}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "${VERSION_NAME%%-*}"
+            VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))
+          else
+            VERSION_NAME="0.1.${{ github.run_number }}-dev"
+            VERSION_CODE=${{ github.run_number }}
+          fi
           ./gradlew :app:assembleDebug -Pskip-matcher \
-            -PversionCode=${{ github.run_number }} -PversionName="$VERSION_NAME"
+            -PversionCode=$VERSION_CODE -PversionName="$VERSION_NAME"
           cp app/build/outputs/apk/debug/app-debug.apk smart-checkin-wallet-debug.apk
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Publish the release
