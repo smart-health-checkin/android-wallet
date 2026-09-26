@@ -37,7 +37,10 @@ class ConformanceTest {
             if (c.getString("status") == "pending" || c.getString("capability") !in claims) continue
             ran++
             val passed = try { run(c) } catch (e: Throwable) { false }
-            if (known.has(id)) {
+            if (c.getString("capability") == "wallet-response") {
+                // Here we only build the credential; the reference verifier judges it (and applies known failures).
+                if (!passed) unexpectedFailures += "$id: couldn't build a credential"
+            } else if (known.has(id)) {
                 if (passed) unexpectedPasses += id
             } else if (!passed) {
                 unexpectedFailures += "$id: ${c.getString("description")}"
