@@ -19,7 +19,7 @@ android {
         minSdk 26
         targetSdk 35
         // Release builds pass -PversionCode and -PversionName (the release
-        // workflow uses the run number) so each install upgrades the last.
+        // workflow derives the code from the version) so each install upgrades the last.
         versionCode((project.findProperty("versionCode") ?: "1").toString().toInteger())
         versionName((project.findProperty("versionName") ?: "0.1.0").toString())
         buildConfigField "String", "REGISTRATION_MODE", "\"${registrationMode}\""
@@ -27,6 +27,21 @@ android {
         // heapgrowthlimit). Only used to separate transport limits from endpoint memory
         // limits in the payload probe; the default build does not request it.
         manifestPlaceholders = [largeHeap: project.hasProperty("large-heap") ? "true" : "false"]
+    }
+
+    // -Pdebug-keystore=<path>: sign debug builds with that keystore (the
+    // standard debug alias and passwords) instead of this machine's own.
+    // The release workflow passes the shared key, so every release installs
+    // over the last.
+    if (project.hasProperty("debug-keystore")) {
+        signingConfigs {
+            debug {
+                storeFile file(project.property("debug-keystore").toString())
+                storePassword "android"
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+            }
+        }
     }
 
     compileOptions {

@@ -2,7 +2,8 @@ name: Android wallet release
 
 # Builds the reference Android wallet as a debuggable APK and publishes it as a
 # GitHub release. Every release is signed with the same debug key (repository
-# secret ANDROID_DEBUG_KEYSTORE_B64), so each one installs over the last.
+# secret ANDROID_DEBUG_KEYSTORE_B64, certificate SHA-256 84643eb6…), so each
+# one installs over the last; the build fails if the APK has any other signer.
 #
 # Stable download link for the latest release:
 #   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk
@@ -24,8 +25,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install the fixed debug signing key
         run: |
-          mkdir -p ~/.android
-          echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > ~/.android/debug.keystore
+          echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+          [ -s "$RUNNER_TEMP/debug.keystore" ] || { echo "ANDROID_DEBUG_KEYSTORE_B64 is empty"; exit 1; }
       - name: Unit tests
         run: ./gradlew test -Pskip-matcher
       - name: Build
@@ -46,9 +47,15 @@ jobs:
             VERSION_NAME="0.1.${{ github.run_number }}-dev"
             VERSION_CODE=${{ github.run_number }}
           fi
-          ./gradlew :app:assembleDebug -Pskip-matcher \
+          ./gradlew :app:assembleDebug -Pskip-matcher -Pdebug-keystore="$RUNNER_TEMP/debug.keystore" \
             -PversionCode=$VERSION_CODE -PversionName="$VERSION_NAME"
           cp app/build/outputs/apk/debug/app-debug.apk smart-checkin-wallet-debug.apk
+      - name: Signed with the shared key
+        # A release signed with any other key can't install over earlier ones.
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs smart-checkin-wallet-debug.apk | tee /dev/stderr \
+            | grep -q "SHA-256 digest: 84643eb69bc95a2dc4ec2d4d92af77a64a8cb00f0e2c7b99bce393cee202dda4"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Publish the release
         env:
