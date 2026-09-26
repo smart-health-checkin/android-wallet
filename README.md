@@ -25,7 +25,7 @@ screens.
 | `smart-checkin-credential-manager` | Android Credential Manager / registry-provider registration for the wallet entry and matcher bytes. | [`smart-checkin-credential-manager/README.md`](smart-checkin-credential-manager/README.md) |
 | `smart-checkin-ui-compose` | Compose demo/reusable UI layer: registration home, holder review screens, Questionnaire rendering helpers, theme/state. | [`smart-checkin-ui-compose/README.md`](smart-checkin-ui-compose/README.md) |
 | `app` | Demo app shell: manifest, `HandlerActivity`, sample wallet store, bundled demo assets, matcher build/copy tasks, end-to-end wiring. | This file |
-| `rp-app` | Spike: a *native relying party* that requests a check-in from the wallet directly through Credential Manager (no browser), plus WebView / Custom Tab probes. | [`rp-app/README.md`](rp-app/README.md) |
+| `verifier-app` | Example: a native app as the Verifier, through the browser (Custom Tab and message channel, reaching web wallets too) or directly through Credential Manager. | [`verifier-app/README.md`](verifier-app/README.md) |
 
 Dependency direction:
 
