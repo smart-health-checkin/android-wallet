@@ -12,13 +12,8 @@
     "mdoc-verify": "Wallet side: verifiers check the mdoc layer."
   },
   "knownFailures": {
-    "request-cbor/duplicate-key-items-request": "MdocCbor.decode keeps the last duplicate map key (D15)",
+    "request-cbor/encryption-info-wrong-tag": "rejects instead of warning (WRQ-7)",
     "request-cbor/encryption-key-wrong-curve": "SmartMdocCrypto.publicKeyFromCose doesn't check kty/crv",
-    "request-cbor/intent-not-bool": "MdocCbor.kt coerces a non-boolean intentToRetain to false",
-    "request-cbor/padded-base64url": "SmartMdocBase64 accepts padding",
-    "request-cbor/two-smart-doc-requests": "MdocCbor.kt takes the first SMART DocRequest without counting them (WRQ-4)",
-    "request-cbor/unknown-version": "MdocCbor.kt doesn't check DeviceRequest version",
-    "request-cbor/wrong-protocol": "DirectMdocRequest.kt also accepts protocol org.iso.mdoc",
     "request-json/blank-canonical": "SmartRequest.kt rejects the whole request; the item should be unsupported (SEL-10)",
     "request-json/content-kind-not-string": "SmartRequest.kt coerces a numeric kind with optString instead of rejecting the request (REQ-2)",
     "request-json/form-no-source": "SmartRequest.kt rejects the whole request; the item should be unsupported (FORM-1, REQ-2)",

@@ -57,40 +57,49 @@ class ConformanceTest {
 
     private fun input(c: JSONObject, key: String) = File(root, c.getJSONObject("inputs").getString(key))
     private fun text(c: JSONObject, key: String) = input(c, key).readText()
-    private fun expectedValid(c: JSONObject) = c.getJSONObject("expected").getBoolean("valid")
-    private fun output(c: JSONObject, key: String) = File(root, c.getJSONObject("expected").getJSONObject("outputs").getString(key))
+    private fun outcome(c: JSONObject) = c.getJSONObject("expected").getString("outcome")
+    private fun outputs(c: JSONObject) = c.getJSONObject("expected").optJSONObject("outputs")
+    private fun output(c: JSONObject, key: String) = File(root, outputs(c)!!.getString(key))
 
-    /** Did the wallet reach the expected verdict (and outputs) for the case? */
-    private fun run(c: JSONObject): Boolean {
-        val valid = expectedValid(c)
-        return when (c.getString("capability")) {
-            "request-json" -> verdict(valid) {
-                SmartRequestAdapter.build("https://clinic.example", "nonce", JSONObject(text(c, "request")))
-                true
-            }
-            "request-cbor" -> verdict(valid) {
-                val parsed = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), "https://clinic.example")
-                val smart = parsed.itemsRequest.smartRequestJson ?: error("no SMART request")
-                SmartRequestAdapter.build("https://clinic.example", "nonce", smart)
-                !valid || smart.similar(JSONObject(output(c, "smartRequest").readText()))
-            }
-            "transcript" -> {
-                val t = DirectMdocRequestParser.buildSessionTranscript(text(c, "encryptionInfo").trim(), text(c, "origin").trim())
-                t.contentEquals(output(c, "sessionTranscript").readBytes())
-            }
-            "wallet-response" -> {
-                val origin = text(c, "origin").trim()
-                val request = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), origin)
-                val response = SmartHealthMdocResponder.buildCredentialResponse(request, JSONObject(text(c, "smartResponse")))
-                File(walletOut, c.getString("id").replace('/', '_') + ".json").writeText(response.credentialJson)
-                true
-            }
-            else -> error("no runner for ${c.getString("capability")}")
+    /** Did the wallet reach the expected outcome (and outputs) for the case? */
+    private fun run(c: JSONObject): Boolean = when (c.getString("capability")) {
+        "request-json" -> judge(c) {
+            SmartRequestAdapter.build("https://clinic.example", "nonce", JSONObject(text(c, "request")))
+            true
         }
+        "request-cbor" -> judge(c) {
+            val parsed = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), "https://clinic.example")
+            val smart = parsed.itemsRequest.smartRequestJson ?: error("no SMART request")
+            SmartRequestAdapter.build("https://clinic.example", "nonce", smart)
+            outputs(c)?.has("smartRequest") != true || smart.similar(JSONObject(output(c, "smartRequest").readText()))
+        }
+        "transcript" -> {
+            val t = DirectMdocRequestParser.buildSessionTranscript(text(c, "encryptionInfo").trim(), text(c, "origin").trim())
+            t.contentEquals(output(c, "sessionTranscript").readBytes())
+        }
+        "wallet-response" -> {
+            val origin = text(c, "origin").trim()
+            val request = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), origin)
+            val response = SmartHealthMdocResponder.buildCredentialResponse(request, JSONObject(text(c, "smartResponse")))
+            File(walletOut, c.getString("id").replace('/', '_') + ".json").writeText(response.credentialJson)
+            true
+        }
+        else -> error("no runner for ${c.getString("capability")}")
     }
 
-    private fun verdict(expectedValid: Boolean, check: () -> Boolean): Boolean =
-        try { check() == expectedValid } catch (e: Throwable) { !expectedValid }
+    /**
+     * `attempt` throws when the wallet rejects the input, and otherwise returns
+     * whether its outputs match. accept and warn both require accepting;
+     * reporting the warning is advisory (RCV-1).
+     */
+    private fun judge(c: JSONObject, attempt: () -> Boolean): Boolean {
+        val result = try { attempt() } catch (e: Throwable) { null }
+        return when (outcome(c)) {
+            "reject" -> result == null
+            "warn-or-reject" -> result != false
+            else -> result == true
+        }
+    }
 
     private fun JSONArray.toStrings() = (0 until length()).map { getString(it) }
 }
