@@ -12,7 +12,11 @@ The sample Android wallet. Released as an APK from `wallet-vX.Y.Z` tags.
   for `wallet-response` land in `app/build/conformance-wallet/`, and CI checks
   them with `bun spec-conformance/reference/verify-wallet-output.ts
   app/build/conformance-wallet conformance/known-failures.json`.
-  `conformance/known-failures.json` lists what fails today and must shrink.
+  `conformance/known-failures.json` lists what fails today (empty as of W5); the
+  runner also checks per-item `unsupported` outcomes and that every expected
+  warning is reported.
+- Names follow the spec: Verifier, Wallet, Holder. Not Responder, Requester,
+  or RP.
 - Build: `./gradlew :app:assembleDebug --no-daemon`.
 - **Releasing:** push tag `wallet-vX.Y.Z`; `android-release.yml` builds, signs,
   and attaches the APK. Links everywhere use `releases/latest/download/`, so

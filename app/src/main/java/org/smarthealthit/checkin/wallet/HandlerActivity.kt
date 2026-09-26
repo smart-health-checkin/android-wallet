@@ -163,15 +163,14 @@ class HandlerActivity : ComponentActivity() {
         }
         directMdocRequest = parsed
 
-        Log.i(
-            TAG,
-            "SMART request carriers ${parsed.itemsRequest.requestCarrierDebug.label()} " +
-                "companionElementLength=${parsed.itemsRequest.requestCarrierDebug.companionElementLength}",
-        )
+        if (parsed.warnings.isNotEmpty()) {
+            // Spec §8.4: these don't stop the Wallet; they're reported ([RCV-1]).
+            Log.w(TAG, "request transport warnings: ${parsed.warnings.joinToString(", ")}")
+        }
         val smartJson = parsed.itemsRequest.smartRequestJson
         if (smartJson == null) {
             screenState = ScreenState.Error(
-                "No SMART request JSON found in requestInfo or smart_request_b64u companion element."
+                "No SMART request JSON found in requestInfo."
             )
             return
         }
@@ -209,50 +208,50 @@ class HandlerActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * The origin for the session transcript (spec [TR-2]). A browser on the
+     * privileged-caller allowlist reports the web page's origin. Any other app
+     * caller gets none from Android, so the origin is
+     * `android:apk-key-hash:<base64url SHA-256 of its signing certificate>`, the
+     * format Android's holder documentation, Multipaz, and Google Wallet use.
+     */
     private fun resolveOrigin(callingAppInfo: CallingAppInfo): OriginResolution {
-        val allowlist = runCatching { buildCallerAllowlist(callingAppInfo) }.getOrElse { error ->
-            val fallback = "android-app:${callingAppInfo.packageName}"
-            return OriginResolution(
-                origin = fallback,
-                source = "android-app-fallback",
-                isOriginPopulated = runCatching { callingAppInfo.isOriginPopulated() }.getOrDefault(false),
-                allowlistFingerprintCount = 0,
-                allowlistJson = null,
-                error = "${error::class.java.simpleName}: ${error.message}",
-            )
+        val allowlist = runCatching { buildCallerAllowlist(callingAppInfo) }.getOrNull()
+        val webOrigin = allowlist?.let {
+            runCatching { callingAppInfo.getOrigin(it.json) }
+                .onFailure { e -> Log.w(TAG, "callingAppInfo.getOrigin failed", e) }
+                .getOrNull()
         }
-        val webOrigin = runCatching { callingAppInfo.getOrigin(allowlist.json) }
-            .onFailure { Log.w(TAG, "callingAppInfo.getOrigin failed", it) }
-            .getOrNull()
+        val populated = runCatching { callingAppInfo.isOriginPopulated() }.getOrDefault(false)
         if (webOrigin != null) {
             return OriginResolution(
-                origin = webOrigin,
+                origin = webOrigin.trimEnd('/'),
                 source = "web-origin",
-                isOriginPopulated = callingAppInfo.isOriginPopulated(),
+                isOriginPopulated = populated,
                 allowlistFingerprintCount = allowlist.fingerprintCount,
                 allowlistJson = allowlist.json,
                 error = null,
             )
         }
         return OriginResolution(
-            origin = "android-app:${callingAppInfo.packageName}",
-            source = "android-app-fallback",
-            isOriginPopulated = callingAppInfo.isOriginPopulated(),
-            allowlistFingerprintCount = allowlist.fingerprintCount,
-            allowlistJson = allowlist.json,
-            error = "getOrigin returned null or rejected caller",
+            origin = AppCallerOrigin.of(callingAppInfo.signingInfoCompat),
+            source = "android-apk-key-hash",
+            isOriginPopulated = populated,
+            allowlistFingerprintCount = allowlist?.fingerprintCount ?: 0,
+            allowlistJson = allowlist?.json,
+            error = "getOrigin returned no web origin: an app caller",
         )
     }
 
     private data class CallerAllowlist(val json: String, val fingerprintCount: Int)
 
     private fun buildCallerAllowlist(callingAppInfo: CallingAppInfo): CallerAllowlist {
-        // AndroidX reveals the browser-supplied web origin only after the caller app
-        // package/signature matches this allowlist. This dev build trusts the actual
-        // caller reported by Credential Manager so we can verify origin plumbing
-        // end-to-end across browsers. A production wallet should not reflect the
-        // caller back into the allowlist; it should keep an up-to-date allowlist of
-        // trusted browser package names and official APK signing cert fingerprints.
+        // AndroidX reveals a browser-supplied web origin only when the calling app's
+        // package and signing certificate are on this allowlist. This development
+        // build puts whatever app called it on the list, so it will accept any app's
+        // claim to be speaking for a web origin. That's convenient for testing across
+        // browsers and wrong for production: a real wallet keeps a list of the browsers
+        // it trusts (package names and their official signing-certificate fingerprints).
         val fingerprints = originVerificationFingerprints(callingAppInfo.signingInfoCompat)
         val signatures = JSONArray()
         fingerprints.forEach { fingerprint ->
@@ -378,16 +377,10 @@ class HandlerActivity : ComponentActivity() {
             .put("walletStoreMode", walletStoreMode)
         appendToDebugBundle("submit.json", summary.toString(2))
 
-        if (declined) {
-            val resultData = Intent()
-            PendingIntentHandler.setGetCredentialException(
-                resultData,
-                GetCredentialUnknownException("User declined to share."),
-            )
-            setResult(Activity.RESULT_OK, resultData)
-            finish()
-            return
-        }
+        // [HOLD-4]: the Holder reviewed the request and declined everything, so the
+        // Verifier gets a normal response with every item declined. Only closing the
+        // wallet without reviewing (finishWithCancel) ends the call with an error.
+        if (declined) req.items.forEach { selectedItems[it.id] = false }
 
         screenState = ScreenState.Submitting("Building response", "Packaging selected data as an encrypted mdoc response.")
         // Building, signing, and encrypting a large record takes seconds, so it
@@ -409,7 +402,7 @@ class HandlerActivity : ComponentActivity() {
                 val probePad = PayloadProbe.applyPadding(this@HandlerActivity, smartResponse)
 
                 val walletResponse = runCatching {
-                    SmartHealthMdocResponder.buildCredentialResponse(
+                    SmartHealthMdocWallet.buildCredentialResponse(
                         request = mdocRequest,
                         smartResponse = smartResponse,
                     )
@@ -526,10 +519,7 @@ class HandlerActivity : ComponentActivity() {
             .put("readerAuthCertificateSubject", readerAuth.certificateSubject ?: JSONObject.NULL)
             .put("requestCarrierSource", requestCarrierDebug.source)
             .put("requestInfoPresent", requestCarrierDebug.requestInfoPresent)
-            .put("companionPresent", requestCarrierDebug.companionPresent)
-            .put("requestCarrierMatchStatus", requestCarrierDebug.matchStatus)
-            .put("companionElementLength", requestCarrierDebug.companionElementLength)
-            .put("companionElementPreview", requestCarrierDebug.companionElementPreview)
+            .put("transportWarnings", JSONArray(requestCarrierDebug.warnings))
         if (originResolution.allowlistJson != null) {
             manifest.put("originAllowlist", JSONObject(originResolution.allowlistJson))
         }

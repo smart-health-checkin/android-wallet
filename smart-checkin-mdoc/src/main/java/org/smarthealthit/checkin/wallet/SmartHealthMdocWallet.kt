@@ -18,7 +18,7 @@ data class DirectMdocWalletResponse(
     val deviceAuthenticationBytes: ByteArray,
 )
 
-data class MdocResponderTestMaterial(
+data class MdocWalletTestMaterial(
     val nowMillis: Long,
     val issuerKeyPair: KeyPair,
     val deviceKeyPair: KeyPair,
@@ -27,7 +27,7 @@ data class MdocResponderTestMaterial(
     val signatureRandom: SecureRandom,
 )
 
-object SmartHealthMdocResponder {
+object SmartHealthMdocWallet {
     private const val PROTOCOL = "org-iso-mdoc"
     private const val DOC_TYPE = "org.smarthealthit.checkin.1"
     private const val NAMESPACE = "org.smarthealthit.checkin"
@@ -38,7 +38,7 @@ object SmartHealthMdocResponder {
         smartResponse: JSONObject,
         nowMillis: Long = System.currentTimeMillis(),
         random: SecureRandom = SecureRandom(),
-        testMaterial: MdocResponderTestMaterial? = null,
+        testMaterial: MdocWalletTestMaterial? = null,
     ): DirectMdocWalletResponse {
         val effectiveNowMillis = testMaterial?.nowMillis ?: nowMillis
         val smartResponseJson = smartResponse.toString()

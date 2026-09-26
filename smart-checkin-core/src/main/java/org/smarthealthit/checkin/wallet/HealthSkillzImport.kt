@@ -183,6 +183,15 @@ class ImportedFhirWalletStore(
 ) : SmartHealthWalletStore {
     override fun resolveItems(items: List<RequestItem>): List<RequestItemResolution> {
         return items.map { item ->
+            item.unsupportedReason?.let { reason ->
+                return@map RequestItemResolution(
+                    itemId = item.id,
+                    availability = WalletItemAvailability.Unsupported,
+                    candidates = emptyList(),
+                    matchSummary = reason,
+                    statusIfShared = RequestItemStatusCode.Unsupported,
+                )
+            }
             val mediaType = preferredMediaType(item)
             if (mediaType == null) {
                 return@map RequestItemResolution(
@@ -220,17 +229,11 @@ class ImportedFhirWalletStore(
             }
 
             val resourceTypes = requestedResourceTypes(item)
-            if (resourceTypes == null) {
-                return@map RequestItemResolution(
-                    itemId = item.id,
-                    availability = WalletItemAvailability.Unsupported,
-                    candidates = emptyList(),
-                    matchSummary = "This wallet cannot interpret this selector.",
-                    statusIfShared = RequestItemStatusCode.Unsupported,
-                )
-            }
 
-            val candidates = candidatesForResourceTypes(resourceTypes).filter { matchesProfileSelectors(item, it.value) }
+            // Without a known resource type, look at every record and trust only declared profiles.
+            val strictProfiles = resourceTypes == null
+            val candidates = candidatesForResourceTypes(resourceTypes ?: allResourceTypes())
+                .filter { matchesProfileSelectors(item, it.value, strictProfiles) }
             if (candidates.isEmpty()) {
                 RequestItemResolution(
                     itemId = item.id,
@@ -299,25 +302,31 @@ class ImportedFhirWalletStore(
     /**
      * Profile semantics (spec §5.4.1, §5.5). A resource that declares profiles in
      * meta.profile must match a requested profile (unversioned request: any
-     * version; versioned: exact) or sit in a requested profile family.
-     * Resources with no declared profiles, such as imported records, fall back to
-     * the resource-type guess made by requestedResourceTypes.
+     * version; versioned: exact, [CAN-5]) or sit in a requested profile family
+     * ([SEL-5]: its URL starts with the family URL and "/").
+     * A resource with no declared profiles, such as an imported record, falls back
+     * to the resource-type guess made by requestedResourceTypes, except when the
+     * item asks for a versioned profile (only the exact version fulfills it) or
+     * the wallet is matching on profiles alone (`strict`).
      */
-    private fun matchesProfileSelectors(item: RequestItem, resource: JSONObject?): Boolean {
+    private fun matchesProfileSelectors(item: RequestItem, resource: JSONObject?, strict: Boolean = false): Boolean {
         if (resource == null) return false
         val content = item.meta.optJSONObject("content") ?: return true
         val wantProfiles = stringValues(content.opt("profiles"))
         val wantFamilies = stringValues(content.opt("profilesFrom")).map { it.substringBefore('|').trimEnd('/') }
         if (wantProfiles.isEmpty() && wantFamilies.isEmpty()) return true
         val declared = stringValues(resource.optJSONObject("meta")?.opt("profile"))
-        if (declared.isEmpty()) return true
+        if (declared.isEmpty()) return !strict && wantProfiles.none { it.contains('|') }
         return declared.any { have ->
             val haveUrl = have.substringBefore('|')
             wantProfiles.any { want ->
                 haveUrl == want.substringBefore('|') && (!want.contains('|') || have == want)
-            } || wantFamilies.any { family -> haveUrl.startsWith("$family/StructureDefinition/") }
+            } || wantFamilies.any { family -> haveUrl.startsWith("$family/") }
         }
     }
+
+    private fun allResourceTypes(): Set<String> =
+        records.providers.flatMap { it.fhir.keys }.toCollection(linkedSetOf())
 
     private fun fullUrlFor(resource: JSONObject): String? {
         val id = resource.optString("id")
@@ -748,7 +757,6 @@ private fun stringValues(value: Any?): List<String> {
             }
             out
         }
-        is JSONObject -> listOf(value.optString("canonical")).filter { it.isNotBlank() }
         else -> emptyList()
     }
 }

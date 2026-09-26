@@ -2638,7 +2638,7 @@ private fun TechnicalSummary(request: VerifiedRequest) {
         if (expanded) {
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Request carriers",
+                text = "Request transport",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.Muted,
@@ -2646,12 +2646,9 @@ private fun TechnicalSummary(request: VerifiedRequest) {
             Spacer(Modifier.height(6.dp))
             DebugLine("requestInfo", if (request.requestCarrierDebug.requestInfoPresent) "present" else "absent")
             DebugLine(
-                "claim",
-                claimPresenceLabel(request.requestCarrierDebug),
+                "warnings",
+                request.requestCarrierDebug.warnings.ifEmpty { listOf("none") }.joinToString(", "),
             )
-            if (request.requestCarrierDebug.requestInfoPresent && request.requestCarrierDebug.companionPresent) {
-                DebugLine("agreement", carrierJsonMatchLabel(request.requestCarrierDebug))
-            }
             Spacer(Modifier.height(16.dp))
             Text(
                 text = "SMART request JSON",
@@ -2880,17 +2877,6 @@ private fun isEnabledForUi(item: JSONObject, values: JSONObject): Boolean {
     }
 
     return aggregate
-}
-
-private fun carrierJsonMatchLabel(debug: SmartRequestCarrierDebug): String = when {
-    debug.requestInfoPresent && debug.companionPresent ->
-        if (debug.matchStatus == "matched") "same JSON" else "different (${debug.matchStatus})"
-    else -> "n/a"
-}
-
-private fun claimPresenceLabel(debug: SmartRequestCarrierDebug): String {
-    if (!debug.companionPresent) return "absent"
-    return "present (${debug.companionElementLength} chars)"
 }
 
 private fun compareForUi(actual: Any?, condition: JSONObject): Boolean {

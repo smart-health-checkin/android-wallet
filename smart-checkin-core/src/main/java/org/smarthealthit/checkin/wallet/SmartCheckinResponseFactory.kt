@@ -19,6 +19,11 @@ object SmartCheckinResponseFactory {
 
         request.items
             .forEach { item ->
+                // An item the wallet can't process is unsupported whatever the Holder chose (§5.4).
+                item.unsupportedReason?.let {
+                    requestStatus.put(statusJson(item.id, RequestItemStatusCode.Unsupported, it))
+                    return@forEach
+                }
                 if (selectedItems[item.id] == false) {
                     requestStatus.put(statusJson(item.id, RequestItemStatusCode.Declined))
                     return@forEach

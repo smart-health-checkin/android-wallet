@@ -72,7 +72,7 @@ class DirectMdocProtocolTest {
                 ),
             )
 
-        val response = SmartHealthMdocResponder.buildCredentialResponse(
+        val response = SmartHealthMdocWallet.buildCredentialResponse(
             request = request,
             smartResponse = smartResponse,
             nowMillis = 1_700_000_000_000L,

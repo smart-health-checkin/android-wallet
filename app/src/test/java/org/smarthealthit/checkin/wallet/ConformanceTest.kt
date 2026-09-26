@@ -64,14 +64,15 @@ class ConformanceTest {
     /** Did the wallet reach the expected outcome (and outputs) for the case? */
     private fun run(c: JSONObject): Boolean = when (c.getString("capability")) {
         "request-json" -> judge(c) {
-            SmartRequestAdapter.build("https://clinic.example", "nonce", JSONObject(text(c, "request")))
-            true
+            val request = SmartRequestAdapter.build("https://clinic.example", "nonce", JSONObject(text(c, "request")))
+            itemsAsExpected(c, request)
         }
         "request-cbor" -> judge(c) {
             val parsed = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), "https://clinic.example")
             val smart = parsed.itemsRequest.smartRequestJson ?: error("no SMART request")
-            SmartRequestAdapter.build("https://clinic.example", "nonce", smart)
-            outputs(c)?.has("smartRequest") != true || smart.similar(JSONObject(output(c, "smartRequest").readText()))
+            val request = SmartRequestAdapter.build("https://clinic.example", "nonce", smart)
+            (outputs(c)?.has("smartRequest") != true || smart.similar(JSONObject(output(c, "smartRequest").readText()))) &&
+                itemsAsExpected(c, request) && warningsReported(c, parsed.warnings)
         }
         "transcript" -> {
             val t = DirectMdocRequestParser.buildSessionTranscript(text(c, "encryptionInfo").trim(), text(c, "origin").trim())
@@ -80,7 +81,7 @@ class ConformanceTest {
         "wallet-response" -> {
             val origin = text(c, "origin").trim()
             val request = DirectMdocRequestParser.parseRequestJson(text(c, "navigatorArgument"), origin)
-            val response = SmartHealthMdocResponder.buildCredentialResponse(request, JSONObject(text(c, "smartResponse")))
+            val response = SmartHealthMdocWallet.buildCredentialResponse(request, JSONObject(text(c, "smartResponse")))
             File(walletOut, c.getString("id").replace('/', '_') + ".json").writeText(response.credentialJson)
             true
         }
@@ -99,6 +100,20 @@ class ConformanceTest {
             "warn-or-reject" -> result != false
             else -> result == true
         }
+    }
+
+    /** Items the case expects to be unsupported are, and no others are. */
+    private fun itemsAsExpected(c: JSONObject, request: VerifiedRequest): Boolean {
+        val expected = c.getJSONObject("expected").optJSONObject("items") ?: JSONObject()
+        return request.items.all { item ->
+            (expected.optString(item.id) == "unsupported") == (item.unsupportedReason != null)
+        }
+    }
+
+    /** This wallet reports every warning a warn case names (the spec makes reporting a SHOULD; we hold ourselves to it). */
+    private fun warningsReported(c: JSONObject, reported: List<String>): Boolean {
+        val expected = c.getJSONObject("expected").optJSONArray("warnings") ?: return true
+        return expected.toStrings().all { it in reported }
     }
 
     private fun JSONArray.toStrings() = (0 until length()).map { getString(it) }

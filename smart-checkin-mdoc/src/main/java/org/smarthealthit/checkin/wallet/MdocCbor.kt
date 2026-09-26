@@ -26,9 +26,13 @@ object MdocCbor {
     data class CborTag(val tag: Long, val value: Any?)
     data class CborRaw(val bytes: ByteArray)
 
-    /** Decode the entire byte array as a single CBOR value. */
-    fun decode(bytes: ByteArray): Any? {
-        val cursor = Cursor(bytes, 0)
+    /**
+     * Decode the entire byte array as a single CBOR value. A map with a
+     * duplicate key keeps the last value and calls [onDuplicateKey], so a
+     * receiver can warn ([ENC-5]).
+     */
+    fun decode(bytes: ByteArray, onDuplicateKey: (() -> Unit)? = null): Any? {
+        val cursor = Cursor(bytes, 0, onDuplicateKey)
         val value = decodeValue(cursor)
         require(cursor.pos == bytes.size) { "trailing CBOR bytes: ${bytes.size - cursor.pos}" }
         return value
@@ -48,16 +52,16 @@ object MdocCbor {
      * Decode a tag-24 wrapped CBOR item: returns the inner CBOR value
      * (after stripping the tag and the byte-string wrapper).
      */
-    fun decodeTag24(value: Any?): Any? {
+    fun decodeTag24(value: Any?, onDuplicateKey: (() -> Unit)? = null): Any? {
         require(value is CborTag && value.tag == TAG_ENCODED_CBOR) {
             "expected CBOR tag 24, got $value"
         }
         val inner = value.value
         require(inner is ByteArray) { "tag 24 must wrap a byte string" }
-        return decode(inner)
+        return decode(inner, onDuplicateKey)
     }
 
-    private class Cursor(val bytes: ByteArray, var pos: Int) {
+    private class Cursor(val bytes: ByteArray, var pos: Int, val onDuplicateKey: (() -> Unit)? = null) {
         fun read(): Int {
             require(pos < bytes.size) { "unexpected end of CBOR" }
             return bytes[pos++].toInt() and 0xff
@@ -104,6 +108,7 @@ object MdocCbor {
                 repeat(len) {
                     val k = decodeValue(c)
                     val v = decodeValue(c)
+                    if (out.containsKey(k)) c.onDuplicateKey?.invoke()
                     out[k] = v
                 }
                 out
@@ -195,104 +200,78 @@ object MdocCbor {
 
 /**
  * Decoded shape of `data.deviceRequest` for our doctype + namespace.
- *
- * Built by walking the captured `org-iso-mdoc` ItemsRequest:
- *   ItemsRequest = { docType, nameSpaces, requestInfo? }
- * We expect exactly one DocRequest with one ItemsRequest.
+ *   ItemsRequest = { docType, nameSpaces, requestInfo }
+ * The SMART request travels only in requestInfo["org.smarthealthit.checkin.request"].
  */
 data class DecodedItemsRequest(
     val docType: String,
-    val namespaces: Map<String, Map<String, Boolean>>,
+    val namespaces: Map<String, Map<String, Any?>>,
     val smartRequestJson: JSONObject?,
     val requestCarrierDebug: SmartRequestCarrierDebug,
     val itemsRequestTag24Bytes: ByteArray,
     val readerAuthBytes: ByteArray?,
 )
 
+/**
+ * Walks a DeviceRequest the way spec §8.4 does: fail only where a step says
+ * fail, and add a warning code to [warnings] for everything else ([RCV-1]).
+ * Warning codes match the spec's conformance cases.
+ */
 object DeviceRequestParser {
     private const val EXPECTED_DOC_TYPE = "org.smarthealthit.checkin.1"
     private const val EXPECTED_NAMESPACE = "org.smarthealthit.checkin"
+    private const val EXPECTED_ELEMENT = "smart_health_checkin_response"
     private const val SMART_REQUEST_INFO_KEY = "org.smarthealthit.checkin.request"
-    private const val SMART_REQUEST_COMPANION_ELEMENT_PREFIX = "smart_request_b64u."
 
-    /**
-     * Decode a base64url-no-padding `deviceRequest` string into our
-     * SMART-flavored items request. Returns null if the request is not for
-     * our doctype.
-     */
-    fun parse(deviceRequestB64u: String): DecodedItemsRequest? {
+    /** Decode a base64url `deviceRequest`. Returns null if it has no request for our doctype. */
+    fun parse(deviceRequestB64u: String, warnings: MutableSet<String> = linkedSetOf()): DecodedItemsRequest? {
         val bytes = SmartMdocBase64.decodeUrl(deviceRequestB64u)
-        return parseBytes(bytes)
+        return parseBytes(bytes, warnings)
     }
 
-    fun parseBytes(deviceRequestBytes: ByteArray): DecodedItemsRequest? {
-        val outer = MdocCbor.decode(deviceRequestBytes) as? Map<*, *> ?: return null
+    fun parseBytes(deviceRequestBytes: ByteArray, warnings: MutableSet<String> = linkedSetOf()): DecodedItemsRequest? {
+        val dup = { warnings += "cbor-duplicate-key"; Unit }
+        val outer = MdocCbor.decode(deviceRequestBytes, dup) as? Map<*, *> ?: return null
+        // [WRQ-3]
+        if (outer["version"] != "1.0") warnings += "device-request-version"
         val docRequests = outer["docRequests"] as? List<*> ?: return null
-        for (docReq in docRequests) {
-            val docMap = docReq as? Map<*, *> ?: continue
-            val itemsRequestTag = docMap["itemsRequest"] ?: continue
-            val inner = MdocCbor.decodeTag24(itemsRequestTag) as? Map<*, *> ?: continue
-            val docType = inner["docType"] as? String ?: continue
-            if (docType != EXPECTED_DOC_TYPE) continue
-            val nsMap = inner["nameSpaces"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-            val namespaces = nsMap.entries.associate { (k, v) ->
-                val nsName = k as? String ?: ""
-                val elements = (v as? Map<*, *>)?.entries?.associate { (ek, ev) ->
-                    (ek as? String ?: "") to (ev as? Boolean ?: false)
-                } ?: emptyMap()
-                nsName to elements
-            }
-            // SMART payload normally comes from
-            // ItemsRequest.requestInfo["org.smarthealthit.checkin.request"].
-            // A companion requested element can also carry the same JSON for
-            // platforms that expose element identifiers before raw request bytes.
-            val requestInfo = inner["requestInfo"] as? Map<*, *>
-            val requestInfoValue = requestInfo?.get(SMART_REQUEST_INFO_KEY)
-            if (requestInfoValue != null && requestInfoValue !is String) {
-                error("requestInfo[$SMART_REQUEST_INFO_KEY] is not a string")
-            }
-            val elements = namespaces[EXPECTED_NAMESPACE].orEmpty()
-            val companionElements = elements.keys.filter {
-                it.startsWith(SMART_REQUEST_COMPANION_ELEMENT_PREFIX)
-            }
-            if (companionElements.size > 1) {
-                error("multiple SMART request companion elements found")
-            }
-            val companionElement = companionElements.singleOrNull()
-            val companionTstr = companionElement?.let(::decodeCompanionElement)
-            if (requestInfoValue != null && companionTstr != null && requestInfoValue != companionTstr) {
-                error("SMART request companion element does not match requestInfo")
-            }
-            val smartTstr = (requestInfoValue as? String) ?: companionTstr ?: continue
-            val carrierDebug = SmartRequestCarrierDebug(
-                source = if (requestInfoValue is String) "requestInfo" else "companion",
-                requestInfoPresent = requestInfoValue is String,
-                companionPresent = companionTstr != null,
-                matchStatus = if (requestInfoValue is String && companionTstr != null) "matched" else "not-applicable",
-                companionElementLength = companionElement?.length ?: 0,
-                companionElementPreview = companionElement?.let {
-                    if (it.length <= 96) it else it.take(96) + "..."
-                }.orEmpty(),
-            )
-            val smartJson = runCatching { JSONObject(smartTstr) }.getOrElse {
-                error("SMART request JSON is not valid JSON: ${it.message}")
-            }
-            return DecodedItemsRequest(
-                docType = docType,
-                namespaces = namespaces,
-                smartRequestJson = smartJson,
-                requestCarrierDebug = carrierDebug,
-                itemsRequestTag24Bytes = MdocCbor.encode(itemsRequestTag),
-                readerAuthBytes = docMap["readerAuth"]?.let { MdocCbor.encode(it) },
-            )
+        // [WRQ-4]: the DocRequest(s) for our docType; other docTypes are ignored.
+        val ours = docRequests.mapNotNull { docReq ->
+            val docMap = docReq as? Map<*, *> ?: return@mapNotNull null
+            val itemsRequestTag = docMap["itemsRequest"] ?: return@mapNotNull null
+            val inner = runCatching { MdocCbor.decodeTag24(itemsRequestTag, dup) as? Map<*, *> }.getOrNull()
+                ?: return@mapNotNull null
+            if (inner["docType"] != EXPECTED_DOC_TYPE) return@mapNotNull null
+            Triple(docMap, itemsRequestTag, inner)
         }
-        return null
-    }
+        if (ours.size > 1) warnings += "doc-requests"
+        val (docMap, itemsRequestTag, inner) = ours.firstOrNull() ?: return null
 
-    private fun decodeCompanionElement(elementIdentifier: String): String {
-        val encoded = elementIdentifier.removePrefix(SMART_REQUEST_COMPANION_ELEMENT_PREFIX)
-        require(encoded.isNotBlank()) { "SMART request companion element has an empty payload" }
-        return String(SmartMdocBase64.decodeUrl(encoded), StandardCharsets.UTF_8)
-    }
+        // [WRQ-5]
+        val nsMap = inner["nameSpaces"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        val namespaces = nsMap.entries.associate { (k, v) ->
+            (k as? String ?: "") to ((v as? Map<*, *>)?.entries?.associate { (ek, ev) -> (ek as? String ?: "") to ev } ?: emptyMap())
+        }
+        val elements = namespaces[EXPECTED_NAMESPACE]
+        if (elements == null || !elements.containsKey(EXPECTED_ELEMENT)) warnings += "items-request"
+        else if (elements[EXPECTED_ELEMENT] !is Boolean) warnings += "intent-to-retain"
 
+        val requestInfo = inner["requestInfo"] as? Map<*, *>
+        val smartTstr = requestInfo?.get(SMART_REQUEST_INFO_KEY) as? String ?: return null
+        val smartJson = runCatching { JSONObject(smartTstr) }.getOrElse {
+            error("SMART request JSON is not valid JSON: ${it.message}")
+        }
+        return DecodedItemsRequest(
+            docType = EXPECTED_DOC_TYPE,
+            namespaces = namespaces,
+            smartRequestJson = smartJson,
+            requestCarrierDebug = SmartRequestCarrierDebug(
+                source = "requestInfo",
+                requestInfoPresent = true,
+                warnings = warnings.toList(),
+            ),
+            itemsRequestTag24Bytes = MdocCbor.encode(itemsRequestTag),
+            readerAuthBytes = docMap["readerAuth"]?.let { MdocCbor.encode(it) },
+        )
+    }
 }

@@ -34,7 +34,7 @@ class AndroidMdocValidationFixtureTest {
             questionnaireAnswers = questionnaireAnswers,
             walletStore = store,
         )
-        val walletResponse = SmartHealthMdocResponder.buildCredentialResponse(
+        val walletResponse = SmartHealthMdocWallet.buildCredentialResponse(
             request = parsedRequest,
             smartResponse = smartResponse,
             random = seededRandom("fallback"),
@@ -83,8 +83,8 @@ class AndroidMdocValidationFixtureTest {
         return copy
     }
 
-    private fun testMaterial(): MdocResponderTestMaterial {
-        return MdocResponderTestMaterial(
+    private fun testMaterial(): MdocWalletTestMaterial {
+        return MdocWalletTestMaterial(
             nowMillis = TEST_NOW_MILLIS,
             issuerKeyPair = SmartMdocCrypto.generateP256KeyPair(seededRandom("issuer-key")),
             deviceKeyPair = SmartMdocCrypto.generateP256KeyPair(seededRandom("device-key")),

@@ -36,7 +36,7 @@ and invariants.
 | `DirectMdocRequestParser.parseData(...)` | Parses a direct `data` object with `deviceRequest` and `encryptionInfo`. |
 | `DirectMdocRequest` | Parsed request bytes, decoded `ItemsRequest`, encryption info, SessionTranscript, readerAuth status. |
 | `DirectMdocEncryptionInfo` | HPKE nonce and recipient public key from `encryptionInfo`. |
-| `SmartHealthMdocResponder.buildCredentialResponse(...)` | Builds the encrypted direct-mdoc response returned to Credential Manager. |
+| `SmartHealthMdocWallet.buildCredentialResponse(...)` | Builds the encrypted direct-mdoc response returned to Credential Manager. |
 | `DirectMdocWalletResponse` | Response JSON plus debug/test byte artifacts. |
 | `MdocCbor` | Minimal CBOR reader/writer used by the profile. |
 | `SmartMdocCrypto` | P-256, COSE, SHA-256, certificate, and HPKE helpers. |
@@ -70,7 +70,7 @@ wire compatibility.
 ## Response flow
 
 Build SMART response JSON in `smart-checkin-core`, then pass it to the mdoc
-responder:
+wallet code:
 
 ```kotlin
 val smartResponse = SmartCheckinResponseFactory.build(
@@ -80,7 +80,7 @@ val smartResponse = SmartCheckinResponseFactory.build(
     walletStore = walletStore,
 )
 
-val walletResponse = SmartHealthMdocResponder.buildCredentialResponse(
+val walletResponse = SmartHealthMdocWallet.buildCredentialResponse(
     request = directMdocRequest,
     smartResponse = smartResponse,
 )
@@ -105,7 +105,7 @@ contains the SMART response JSON as `smart_health_checkin_response`.
 
 ## Security and test notes
 
-The current demo responder generates per-response demo issuer/device key
+The wallet code generates per-response demo issuer/device key
 material and a self-signed issuer certificate. This is sufficient for fixture
 grounding and protocol experiments; it is not a production issuer trust model.
 

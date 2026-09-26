@@ -63,7 +63,7 @@ HandlerActivity / libraries
   smart-checkin-ui-compose renders holder review and questionnaire input
   app DemoWalletStore resolves selected resources
   smart-checkin-core builds SMART response JSON
-  smart-checkin-mdoc returns encrypted direct-mdoc DeviceResponse
+  smart-checkin-mdoc returns encrypted direct-mdoc DeviceResponse (SmartHealthMdocWallet)
 ```
 
 The SMART request is carried in:
@@ -79,6 +79,36 @@ namespace: org.smarthealthit.checkin
 element:   smart_health_checkin_response
 doctype:   org.smarthealthit.checkin.1
 ```
+
+## How the wallet follows the spec
+
+- **Reading a request** (spec §8.4): it fails, and returns nothing, only when it
+  can't decode the request, finds no DocRequest for `org.smarthealthit.checkin.1`
+  or no request text in `requestInfo`, gets an invalid SMART request, or has no
+  usable P-256 recipient key or origin. Everything else (another protocol name,
+  padded base64url, an unexpected DeviceRequest version, a non-boolean
+  `intentToRetain`, extra DocRequests, a malformed `encryptionInfo` wrapper,
+  duplicate CBOR map keys) is a warning: logged, shown on the debug screen, and
+  the wallet carries on.
+- **Items** (§5.4): a selector problem inside one item (an unknown `kind`,
+  mixed form and selection members, a malformed filter array) makes only that
+  item `unsupported`. A `selection.fhir` item with no filters is answered from
+  the wallet's records. A profile the wallet has no category for is matched by
+  `meta.profile` and answered `unavailable` if nothing matches. Old selector
+  members such as `canonical` and `resource` are ignored.
+- **Versioned canonicals** (§5.5): a versioned form is fetched from its bare
+  URL and used only if the Questionnaire's `url` and `version` match exactly. A
+  versioned profile is fulfilled only by records whose `meta.profile` names that
+  exact version.
+- **Declining everything** (§5.7): after reviewing, Decline returns a normal
+  response with every item `declined`. Closing the wallet without reviewing
+  ends the call with an error.
+- **The origin** (§8.3, [TR-2]): a browser on the privileged-caller allowlist
+  reports the page's origin. A native app calling directly gets
+  `android:apk-key-hash:<base64url SHA-256 of its signing certificate>`
+  (`AppCallerOrigin`), which the app computes the same way for its transcript.
+- **The response** (§8.4): a detached device signature, an MSO with
+  `validityInfo`, and only media types the item accepts.
 
 ## Stack
 
@@ -117,7 +147,7 @@ android-wallet/
     README.md
     src/main/java/org/smarthealthit/checkin/wallet/
       DirectMdocRequest.kt
-      SmartHealthMdocResponder.kt
+      SmartHealthMdocWallet.kt
       MdocCbor.kt
       SmartMdocBase64.kt
       SmartMdocCrypto.kt
@@ -173,8 +203,8 @@ bash vendor/scripts/validate-android-mdoc-response.sh
 ```
 
 The full validation regenerates deterministic request fixtures, has Android
-emit a deterministic wallet response, opens that response with the RP web HPKE
-implementation, inspects the decrypted `DeviceResponse`, and runs
+emit a deterministic wallet response, opens that response with the client library's Verifier HPKE
+code, inspects the decrypted `DeviceResponse`, and runs
 pyMDOC-style issuer-signed byte checks.
 
 ## Debug artifacts
@@ -195,7 +225,7 @@ Pull and analyze the latest run:
 ../spec/scripts/pull-android-handler-run.sh   # in a sibling checkout of smart-health-checkin/spec
 ```
 
-For HPKE-open debugging, pair the Android bundle with the RP web console event
+For HPKE-open debugging, pair the Android bundle with the Verifier console event
 `@@SHC@@REQUEST_ARTIFACTS@@...`; it includes verifier request artifacts needed
 for offline inspection.
 

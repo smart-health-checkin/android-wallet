@@ -33,31 +33,18 @@ data class VerifiedRequest(
     val items: List<RequestItem>,
 )
 
+/**
+ * Where the SMART request came from, and transport findings the wallet reported
+ * while reading it (spec §8.4, warnings per [RCV-1]).
+ */
 data class SmartRequestCarrierDebug(
     val source: String = "none",
     val requestInfoPresent: Boolean = false,
-    val companionPresent: Boolean = false,
-    val matchStatus: String = "not-applicable",
-    val companionElementLength: Int = 0,
-    val companionElementPreview: String = "",
+    val warnings: List<String> = emptyList(),
 ) {
-    fun sourceLabel(): String = when (source) {
-        "requestInfo" -> "requestInfo"
-        "companion" -> "claim"
-        else -> source
-    }
-
     fun label(): String {
-        val found = listOfNotNull(
-            if (requestInfoPresent) "requestInfo" else null,
-            if (companionPresent) "claim" else null,
-        ).ifEmpty { listOf("none") }.joinToString(" + ")
-        val match = if (requestInfoPresent && companionPresent) {
-            if (matchStatus == "matched") " · agreement same JSON" else " · agreement $matchStatus"
-        } else {
-            ""
-        }
-        return "$found$match; using ${sourceLabel()}"
+        val found = if (requestInfoPresent) "requestInfo" else "none"
+        return if (warnings.isEmpty()) found else "$found; warnings: ${warnings.joinToString(", ")}"
     }
 }
 
@@ -68,6 +55,8 @@ data class RequestItem(
     val kind: RequestKind,
     val meta: JSONObject,
     val acceptedMediaTypes: List<String> = listOf("application/fhir+json"),
+    /** Set when the wallet can't process this item (spec §5.4); it is answered `unsupported`. */
+    val unsupportedReason: String? = null,
 )
 
 enum class RequestKind {

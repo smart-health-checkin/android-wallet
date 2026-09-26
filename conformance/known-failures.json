@@ -8,16 +8,8 @@
   "notClaimed": {
     "response-json": "Wallet side: the wallet builds responses; it doesn't validate other responses.",
     "cross-validation": "Wallet side: verifiers cross-validate.",
-    "hpke-open": "Wallet side: the wallet seals; the rp-app demo opens, but it isn't a library under test.",
+    "hpke-open": "Wallet side: the wallet seals; the example Verifier app opens, but it isn't a library under test.",
     "mdoc-verify": "Wallet side: verifiers check the mdoc layer."
   },
-  "knownFailures": {
-    "request-cbor/encryption-info-wrong-tag": "rejects instead of warning (WRQ-7)",
-    "request-cbor/encryption-key-wrong-curve": "SmartMdocCrypto.publicKeyFromCose doesn't check kty/crv",
-    "request-json/blank-canonical": "SmartRequest.kt rejects the whole request; the item should be unsupported (SEL-10)",
-    "request-json/content-kind-not-string": "SmartRequest.kt coerces a numeric kind with optString instead of rejecting the request (REQ-2)",
-    "request-json/form-no-source": "SmartRequest.kt rejects the whole request; the item should be unsupported (FORM-1, REQ-2)",
-    "request-json/questionnaire-wrong-type": "SmartRequest.kt rejects the whole request; the item should be unsupported (FORM-1, REQ-2)",
-    "request-json/version-number": "SmartRequestAdapter uses optString, so the number 1 reads as \"1\""
-  }
+  "knownFailures": {}
 }

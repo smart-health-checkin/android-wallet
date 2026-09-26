@@ -19,10 +19,11 @@ object SmartRequestAdapter {
             requestInfoPresent = true,
         ),
     ): VerifiedRequest {
-        require(smartRequest.optString("type") == "smart-health-checkin-request") {
+        // [REQ-2]: exact strings; a number 1 is not the version "1".
+        require(smartRequest.opt("type") == "smart-health-checkin-request") {
             "type must be \"smart-health-checkin-request\""
         }
-        require(smartRequest.optString("version") == "1") { "version must be \"1\"" }
+        require(smartRequest.opt("version") == "1") { "version must be the string \"1\"" }
         val requestId = requiredString(smartRequest, "id", "id")
         return VerifiedRequest(
             requestId = requestId,
@@ -51,29 +52,34 @@ object SmartRequestAdapter {
             val id = requiredString(item, "id", "items[$i].id")
             require(ids.add(id)) { "items[$i].id is duplicated" }
             requiredString(item, "title", "items[$i].title")
+            // [REQ-2]: content that isn't an object with a string kind invalidates the request;
+            // any other problem inside content affects only this item (§5.4).
             val content = item.optJSONObject("content") ?: error("items[$i].content must be an object")
+            val kind = content.opt("kind")
+            require(kind is String && kind.isNotEmpty()) { "items[$i].content.kind must be a non-empty string" }
             val accept = requiredStringArray(item.optJSONArray("accept"), "items[$i].accept")
-            out += when (content.optString("kind")) {
+            out += when (kind) {
                 "form.fhir" -> parseQuestionnaireItem(id, item, content, accept)
                 "selection.fhir" -> parseFhirResourcesItem(id, item, content, accept)
-                else -> {
-                    // An extension selector kind (spec §5.4.3). Keep the item so the
-                    // wallet can answer it "unsupported" and still serve the others.
-                    val kind = content.optString("kind")
-                    require(kind.isNotBlank()) { "items[$i].content.kind must be a non-empty string" }
-                    RequestItem(
-                        id = id,
-                        title = item.optString("title"),
-                        subtitle = "Selector kind \"$kind\" is not supported by this wallet",
-                        kind = RequestKind.Unknown,
-                        meta = JSONObject(item.toString()),
-                        acceptedMediaTypes = accept,
-                    )
-                }
+                // An extension selector kind (§5.4.3, [SEL-9]): answered unsupported, others still served.
+                else -> unsupported(id, item, accept, "Selector kind \"$kind\" is not supported by this wallet")
             }
         }
         return out
     }
+
+    private fun unsupported(id: String, item: JSONObject, accept: List<String>, reason: String) = RequestItem(
+        id = id,
+        title = item.optString("title").ifBlank { id },
+        subtitle = reason,
+        kind = RequestKind.Unknown,
+        meta = JSONObject(item.toString()),
+        acceptedMediaTypes = accept,
+        unsupportedReason = reason,
+    )
+
+    private val SELECTION_MEMBERS = listOf("profiles", "profilesFrom", "resourceTypes")
+    private val FORM_MEMBERS = listOf("questionnaireCanonical", "questionnaire")
 
     private fun parseQuestionnaireItem(
         id: String,
@@ -81,19 +87,28 @@ object SmartRequestAdapter {
         content: JSONObject,
         accept: List<String>,
     ): RequestItem {
-        require(!content.has("canonical")) {
-            "items[id=$id].content.canonical is not a SMART Health Check-in 1.0 selector member; use questionnaireCanonical"
+        // [FORM-1]: these make only this item unsupported. Members this spec doesn't
+        // define (such as the pre-1.0 canonical and resource) are ignored ([JSON-3]).
+        SELECTION_MEMBERS.firstOrNull { content.has(it) }?.let {
+            return unsupported(id, item, accept, "A form item can't also carry $it")
         }
-        require(!content.has("resource")) {
-            "items[id=$id].content.resource is not a SMART Health Check-in 1.0 selector member; use questionnaire"
+        val rawCanonical = content.opt("questionnaireCanonical")
+        if (content.has("questionnaireCanonical") && !(rawCanonical is String && rawCanonical.isNotEmpty())) {
+            return unsupported(id, item, accept, "questionnaireCanonical must be a non-empty string")
+        }
+        val rawQuestionnaire = content.opt("questionnaire")
+        if (content.has("questionnaire") &&
+            !(rawQuestionnaire is JSONObject && rawQuestionnaire.opt("resourceType") == "Questionnaire")
+        ) {
+            return unsupported(id, item, accept, "questionnaire is not a FHIR Questionnaire")
+        }
+        val resource = (rawQuestionnaire as? JSONObject)?.let { JSONObject(it.toString()) }
+        if (resource == null && rawCanonical == null) {
+            return unsupported(id, item, accept, "A form item needs questionnaireCanonical or questionnaire")
         }
         val meta = JSONObject(item.toString())
-        val resource = questionnaireResource(content)
-        val canonical = questionnaireCanonical(content, resource)
-        require(resource != null || !canonical.isNullOrBlank()) {
-            "items[id=$id].content must include questionnaireCanonical or a Questionnaire resource"
-        }
         if (resource != null) meta.put("questionnaire", resource)
+        val canonical = questionnaireCanonical(rawCanonical as? String, resource)
         if (!canonical.isNullOrBlank()) {
             meta.put("questionnaireCanonical", canonical)
             meta.put("questionnaireUrl", canonical)
@@ -118,11 +133,23 @@ object SmartRequestAdapter {
         content: JSONObject,
         accept: List<String>,
     ): RequestItem {
-        val profiles = stringList(content.optJSONArray("profiles"))
+        // [SEL-8], [SEL-10]: these make only this item unsupported.
+        FORM_MEMBERS.firstOrNull { content.has(it) }?.let {
+            return unsupported(id, item, accept, "A selection item can't also carry $it")
+        }
+        for (member in SELECTION_MEMBERS) {
+            if (content.has(member) && nonEmptyStrings(content.opt(member)) == null) {
+                return unsupported(id, item, accept, "$member must be a non-empty array of strings")
+            }
+        }
+        val profiles = nonEmptyStrings(content.opt("profiles")).orEmpty()
             .map { it.substringBefore('|').lowercase() }
             .toSet()
-        val resourceTypes = stringList(content.optJSONArray("resourceTypes")).map { it.lowercase() }.toSet()
-        val profileCollections = profilesFromCanonicals(content.opt("profilesFrom"))
+        val resourceTypes = nonEmptyStrings(content.opt("resourceTypes")).orEmpty().map { it.lowercase() }.toSet()
+        val profileCollections = nonEmptyStrings(content.opt("profilesFrom")).orEmpty()
+            .map { it.substringBefore('|').lowercase() }
+            .toSet()
+        val noFilters = SELECTION_MEMBERS.none { content.has(it) }
         val summary = item.optString("summary")
         return when {
             profiles.any { it.endsWith("/structuredefinition/c4dic-coverage") } ||
@@ -145,7 +172,8 @@ object SmartRequestAdapter {
                 meta = JSONObject(item.toString()),
                 acceptedMediaTypes = accept,
             )
-            profiles.any {
+            // [SEL-7]: no filters means the wallet and Holder decide what's relevant.
+            noFilters || profiles.any {
                 it.endsWith("/structuredefinition/us-core-patient") ||
                     it.endsWith("/structuredefinition/us-core-condition-problems-health-concerns") ||
                     it.endsWith("/structuredefinition/us-core-allergyintolerance") ||
@@ -164,6 +192,8 @@ object SmartRequestAdapter {
                 meta = JSONObject(item.toString()),
                 acceptedMediaTypes = accept,
             )
+            // Profiles or types this wallet has no category for: still matched against its
+            // records by meta.profile and resource type, so the answer is unavailable, not unsupported.
             else -> RequestItem(
                 id = id,
                 title = item.optString("title").ifBlank { id },
@@ -175,35 +205,20 @@ object SmartRequestAdapter {
         }
     }
 
-    private fun profilesFromCanonicals(value: Any?): Set<String> {
-        val out = LinkedHashSet<String>()
-        fun addOne(v: Any?) {
-            when (v) {
-                is String -> if (v.isNotBlank()) out += v.substringBefore('|').lowercase()
-                is JSONObject -> {
-                    val canonical = v.optString("canonical")
-                    if (canonical.isNotBlank()) out += canonical.substringBefore('|').lowercase()
-                }
-                is JSONArray -> {
-                    for (i in 0 until v.length()) addOne(v.opt(i))
-                }
-            }
+    /** A JSON array of one or more non-empty strings, else null. */
+    private fun nonEmptyStrings(value: Any?): List<String>? {
+        if (value !is JSONArray || value.length() == 0) return null
+        val out = ArrayList<String>(value.length())
+        for (i in 0 until value.length()) {
+            val v = value.opt(i)
+            if (v !is String || v.isEmpty()) return null
+            out += v
         }
-        addOne(value)
         return out
     }
 
-    private fun questionnaireResource(content: JSONObject): JSONObject? {
-        val resource = content.optJSONObject("questionnaire") ?: return null
-        require(resource.optString("resourceType") == "Questionnaire") {
-            "items[].content.questionnaire is not a Questionnaire (resourceType=\"Questionnaire\")"
-        }
-        return JSONObject(resource.toString())
-    }
-
-    private fun questionnaireCanonical(content: JSONObject, resource: JSONObject?): String? {
-        val direct = content.optString("questionnaireCanonical").ifBlank { null }
-        if (direct != null) return direct
+    private fun questionnaireCanonical(direct: String?, resource: JSONObject?): String? {
+        if (!direct.isNullOrEmpty()) return direct
         return resource?.let { questionnaire ->
             val url = questionnaire.optString("url")
             if (url.isBlank()) null else {
@@ -211,15 +226,6 @@ object SmartRequestAdapter {
                 if (version.isBlank()) url else "$url|$version"
             }
         }
-    }
-
-    private fun stringList(array: JSONArray?): List<String> {
-        if (array == null) return emptyList()
-        val out = ArrayList<String>(array.length())
-        for (i in 0 until array.length()) {
-            array.optString(i).takeIf { it.isNotBlank() }?.let(out::add)
-        }
-        return out
     }
 
     private fun requiredString(obj: JSONObject, key: String, diagnosticPath: String): String {

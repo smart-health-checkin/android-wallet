@@ -65,7 +65,7 @@ Each `RequestItem` includes a UI title/subtitle, `RequestKind`, raw metadata,
 and accepted media types. The UI can show a user-friendly review without
 knowing how the request was carried over mdoc.
 
-Displayed verifier origin is one presentation-layer signal, not requester or
+The displayed Verifier origin is one presentation-layer signal, not Verifier or
 organization identity by itself. UI trust labels should keep origin, readerAuth,
 issuer/device evidence, clinical-source provenance, Holder choice, and local
 policy decisions separate.

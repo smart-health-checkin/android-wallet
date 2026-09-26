@@ -19,7 +19,7 @@ import androidx.credentials.provider.ProviderGetCredentialRequest
  *   into the picker has a 512 KiB budget shared with everything else in flight
  *   to that process. Measured on a Pixel 11 Pro XL / Android 17: a result
  *   Intent parcel of 514 KB passes and 522 KB is dropped — *silently*: the
- *   picker stays open and the RP's `navigator.credentials.get()` never
+ *   picker stays open and the Verifier's `navigator.credentials.get()` never
  *   settles. Strings parcel as UTF-16 below 250,000 chars, so the safe budget
  *   is roughly 200,000 chars of `credentialJson`.
  *
@@ -32,7 +32,7 @@ import androidx.credentials.provider.ProviderGetCredentialRequest
  *   as a file descriptor; the Intent carries only a flag. Measured: no
  *   transport ceiling up to 66.7 M chars; the next limit is the wallet's own
  *   managed heap (≈ 20 MB of payload at the default 256 MB, ≈ 50 MB with
- *   `largeHeap`), which fails cleanly and the RP sees a rejected promise.
+ *   `largeHeap`), which fails cleanly and the Verifier sees a rejected promise.
  *
  * The three-argument overload already falls back to Intent-extra mode by
  * itself when no receiver was offered, so a wallet needs nothing from this
