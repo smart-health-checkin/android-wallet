@@ -3,6 +3,8 @@ package org.smarthealthit.checkin.wallet
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -126,6 +128,33 @@ class DirectMdocProtocolTest {
         val deviceAuthNamespaces = deviceAuthentication[3] as MdocCbor.CborTag
         assertEquals(MdocCbor.TAG_ENCODED_CBOR, deviceAuthNamespaces.tag)
         assertArrayEquals(deviceNameSpaces.value as ByteArray, deviceAuthNamespaces.value as ByteArray)
+
+        // ISO 18013-5: deviceSignature is a COSE_Sign1 with a detached (null)
+        // payload, verifiable with the MSO's device key over the rebuilt
+        // DeviceAuthenticationBytes.
+        val deviceAuth = deviceSigned["deviceAuth"] as Map<*, *>
+        val deviceSignature = deviceAuth["deviceSignature"] as List<*>
+        assertEquals(4, deviceSignature.size)
+        assertNull(deviceSignature[2])
+        val deviceKey = SmartMdocCrypto.publicKeyFromCose((mso["deviceKeyInfo"] as Map<*, *>)["deviceKey"] as Map<*, *>)
+        assertTrue(
+            SmartMdocCrypto.verifyDetachedCoseSign1WithKey(
+                MdocCbor.encode(deviceSignature),
+                deviceKey,
+                response.deviceAuthenticationBytes,
+            ),
+        )
+        val otherTranscript = response.deviceAuthenticationBytes.copyOf().also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() }
+        assertFalse(SmartMdocCrypto.verifyDetachedCoseSign1WithKey(MdocCbor.encode(deviceSignature), deviceKey, otherTranscript))
+
+        // issuerAuth keeps its payload, with x5chain (label 33) unprotected,
+        // and the MSO carries validityInfo with tag-0 dates.
+        assertTrue(issuerAuth[2] is ByteArray)
+        assertTrue(((issuerAuth[1] as Map<*, *>)[33L] as List<*>).isNotEmpty())
+        val validityInfo = mso["validityInfo"] as Map<*, *>
+        for (key in listOf("signed", "validFrom", "validUntil")) {
+            assertEquals(0L, (validityInfo[key] as MdocCbor.CborTag).tag)
+        }
 
         val dcapiResponse = MdocCbor.decode(response.dcapiResponseBytes) as List<*>
         assertEquals("dcapi", dcapiResponse[0])

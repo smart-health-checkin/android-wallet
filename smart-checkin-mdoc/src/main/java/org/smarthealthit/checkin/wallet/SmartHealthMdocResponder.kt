@@ -90,6 +90,7 @@ object SmartHealthMdocResponder {
             privateKey = deviceKey.private,
             payload = deviceAuthenticationBytes,
             random = signatureRandom,
+            detachedPayload = true,
         )
 
         val document = linkedMapOf<Any, Any>(

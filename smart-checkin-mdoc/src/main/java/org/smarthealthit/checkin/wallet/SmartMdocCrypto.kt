@@ -85,6 +85,9 @@ object SmartMdocCrypto {
         payload: ByteArray,
         includeX5Chain: X509Certificate? = null,
         random: SecureRandom = SecureRandom(),
+        // ISO 18013-5 deviceSignature and readerAuth carry a detached payload
+        // (null); the verifier rebuilds it. issuerAuth carries its payload.
+        detachedPayload: Boolean = false,
     ): ByteArray {
         val protectedBytes = MdocCbor.encode(linkedMapOf<Any, Any>(1L to -7L))
         val unprotected = linkedMapOf<Any, Any>().apply {
@@ -102,7 +105,26 @@ object SmartMdocCrypto {
         signature.initSign(privateKey, random)
         signature.update(sigStructure)
         val rawSignature = derEcdsaToRaw(signature.sign(), P256_SIZE)
-        return MdocCbor.encode(listOf(protectedBytes, unprotected, payload, rawSignature))
+        return MdocCbor.encode(listOf(protectedBytes, unprotected, if (detachedPayload) null else payload, rawSignature))
+    }
+
+    /** Verify an ES256 COSE_Sign1 whose payload is detached (null) against [publicKey]. */
+    fun verifyDetachedCoseSign1WithKey(
+        coseSign1Bytes: ByteArray,
+        publicKey: PublicKey,
+        detachedPayload: ByteArray,
+    ): Boolean {
+        val coseSign1 = MdocCbor.decode(coseSign1Bytes) as? List<*>
+            ?: error("COSE_Sign1 must be an array")
+        require(coseSign1.size == 4) { "COSE_Sign1 must have four entries" }
+        val protectedBytes = coseSign1[0] as? ByteArray ?: error("protected header must be a bstr")
+        require(coseSign1[2] == null) { "payload must be detached (null)" }
+        val rawSignature = coseSign1[3] as? ByteArray ?: error("signature must be a bstr")
+        val sigStructure = MdocCbor.encode(listOf("Signature1", protectedBytes, ByteArray(0), detachedPayload))
+        val verifier = Signature.getInstance("SHA256withECDSA")
+        verifier.initVerify(publicKey)
+        verifier.update(sigStructure)
+        return verifier.verify(rawEcdsaToDer(rawSignature, P256_SIZE))
     }
 
     fun readerAuthenticationBytes(
