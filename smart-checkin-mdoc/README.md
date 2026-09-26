@@ -25,7 +25,7 @@ request:   ItemsRequest.requestInfo["org.smarthealthit.checkin.request"]
 response:  smart_health_checkin_response
 ```
 
-See [`../../spec.md`](../../spec.md) §8 and Appendix A for the wire profile
+See the [spec](https://smart-health-checkin.org/spec/)'s [§8](https://smart-health-checkin.org/spec/#8-same-device-presentation-flow) and [Appendix A](https://smart-health-checkin.org/spec/#appendix-a-worked-example) for the wire profile
 and invariants.
 
 ## Key types and APIs

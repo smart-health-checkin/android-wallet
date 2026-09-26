@@ -8,7 +8,7 @@ This repo was split out of [smart-health-checkin/spec](https://github.com/smart-
 
 This is the reference native Android wallet for SMART Health Check-in over W3C
 Digital Credentials API using direct `org-iso-mdoc` (specified in
-[the spec](https://smart-health-checkin.org/spec/) §8 and Appendix A).
+[the spec](https://smart-health-checkin.org/spec/) [§8](https://smart-health-checkin.org/spec/#8-same-device-presentation-flow) and [Appendix A](https://smart-health-checkin.org/spec/#appendix-a-worked-example)).
 
 The project is now split into library-shaped Gradle modules plus a demo app.
 The split is intended to make future Android wallet apps small: app code should
@@ -82,7 +82,7 @@ doctype:   org.smarthealthit.checkin.1
 
 ## How the wallet follows the spec
 
-- **Reading a request** (spec §8.4): it fails, and returns nothing, only when it
+- **Reading a request** (spec [§8.4](https://smart-health-checkin.org/spec/#8-4-wallet-request-handling-and-response-construction)): it fails, and returns nothing, only when it
   can't decode the request, finds no DocRequest for `org.smarthealthit.checkin.1`
   or no request text in `requestInfo`, gets an invalid SMART request, or has no
   usable P-256 recipient key or origin. Everything else (another protocol name,
@@ -90,20 +90,20 @@ doctype:   org.smarthealthit.checkin.1
   `intentToRetain`, extra DocRequests, a malformed `encryptionInfo` wrapper,
   duplicate CBOR map keys) is a warning: logged, shown on the debug screen, and
   the wallet carries on.
-- **Items** (§5.4): a selector problem inside one item (an unknown `kind`,
+- **Items** ([§5.4](https://smart-health-checkin.org/spec/#5-4-content-selectors)): a selector problem inside one item (an unknown `kind`,
   mixed form and selection members, a malformed filter array) makes only that
   item `unsupported`. A `selection.fhir` item with no filters is answered from
   the wallet's records. A profile the wallet has no category for is matched by
   `meta.profile` and answered `unavailable` if nothing matches. Old selector
   members such as `canonical` and `resource` are ignored.
-- **Versioned canonicals** (§5.5): a versioned form is fetched from its bare
+- **Versioned canonicals** ([§5.5](https://smart-health-checkin.org/spec/#5-5-canonical-version-handling)): a versioned form is fetched from its bare
   URL and used only if the Questionnaire's `url` and `version` match exactly. A
   versioned profile is fulfilled only by records whose `meta.profile` names that
   exact version.
-- **Declining everything** (§5.7): after reviewing, Decline returns a normal
+- **Declining everything** ([§5.7](https://smart-health-checkin.org/spec/#5-7-identity-trust-and-holder-control)): after reviewing, Decline returns a normal
   response with every item `declined`. Closing the wallet without reviewing
   ends the call with an error.
-- **The origin** (§8.3, [TR-2]): a browser on the privileged-caller allowlist
+- **The origin** ([§8.3](https://smart-health-checkin.org/spec/#8-3-sessiontranscript), [TR-2](https://smart-health-checkin.org/spec/#TR-2)): a browser on the privileged-caller allowlist
   reports the page's origin. A native app calling directly gets
   `android:apk-key-hash:<base64url SHA-256 of its signing certificate>`
   (`AppCallerOrigin`), which the app computes the same way for its transcript.
