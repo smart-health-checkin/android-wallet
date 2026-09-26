@@ -1,7 +1,7 @@
 # verifier-app: a native Android app as the Verifier
 
 An example of a native app asking for a SMART Health Check-in. The developer
-guide is [Native apps](https://smart-health-checkin.org/client/docs/native-apps.html).
+guide is [Native Verifier apps](https://smart-health-checkin.org/client/docs/native-apps.html).
 
 | Button | What it does | Reaches |
 | --- | --- | --- |
