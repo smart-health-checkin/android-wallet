@@ -74,7 +74,7 @@ class RequestFixtureParserTest {
     @Test
     fun rejectsUnrelatedMdlDirectMdocCapture() {
         val capture = File(
-            "../../fixtures/captures/2026-04-30-mattr-safari-org-iso-mdoc/" +
+            "../fixtures/captures/2026-04-30-mattr-safari-org-iso-mdoc/" +
                 "navigator-credentials-get.arg.json",
         )
 
@@ -86,7 +86,7 @@ class RequestFixtureParserTest {
     }
 
     private fun fixtureDir(id: String): File {
-        return File("../../fixtures/dcapi-requests/$id")
+        return File("../fixtures/dcapi-requests/$id")
     }
 
     private companion object {

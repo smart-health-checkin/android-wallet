@@ -67,7 +67,7 @@ HEAD):
 ## Layout
 
 ```
-wallet-android/app/matcher-rs/
+app/matcher-rs/
   Cargo.toml
   build.sh                # the canonical build command
   src/
@@ -101,9 +101,9 @@ sudo apt install binaryen   # or: brew install binaryen
 # → target/wasm32-unknown-unknown/release/checkin.wasm
 ```
 
-The Gradle build in `wallet-android/app/build.gradle` invokes this directory's
+The Gradle build in `app/build.gradle` invokes this directory's
 `build.sh` and copies the output into
-`wallet-android/app/src/main/assets/matcher.wasm`.
+`app/src/main/assets/matcher.wasm`.
 
 ## Test
 

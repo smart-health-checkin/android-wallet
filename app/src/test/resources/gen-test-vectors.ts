@@ -46,7 +46,7 @@ const REJECTION_HEX_FIXTURES = [
     description:
       "captured Mattr Safari-UA request asking for org.iso.18013.5.1.mDL",
     relPath:
-      "../../../../../fixtures/captures/2026-04-30-mattr-safari-org-iso-mdoc/device-request.cbor.hex",
+      "../../../../fixtures/captures/2026-04-30-mattr-safari-org-iso-mdoc/device-request.cbor.hex",
   },
 ];
 

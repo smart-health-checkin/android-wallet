@@ -10,7 +10,7 @@ import org.junit.Test
 class AndroidMdocValidationFixtureTest {
     @Test
     fun writesDeterministicResponseFixtureForRpWebValidation() {
-        val requestFixture = File("../../fixtures/dcapi-requests/ts-smart-checkin-basic")
+        val requestFixture = File("../fixtures/dcapi-requests/ts-smart-checkin-basic")
         val outputDir = File("build/generated/mdoc-validation/ts-smart-checkin-basic")
         val requestMetadata = JSONObject(File(requestFixture, "metadata.json").readText())
         val parsedRequest = DirectMdocRequestParser.parseRequestJson(

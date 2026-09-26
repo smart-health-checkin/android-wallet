@@ -1,8 +1,14 @@
-# Android SMART Health Check-in wallet libraries
+# SMART Health Check-in Android wallet
 
-`wallet-android` is a native Android wallet for SMART Health Check-in over W3C
+Download the latest build: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk>
+
+This repo was split out of [smart-health-checkin/spec](https://github.com/smart-health-checkin/spec) with its history. Test fixtures are copied from the spec; see [`fixtures/README.md`](fixtures/README.md). Test vectors are generated from the client library: `bun install && bun run vectors`.
+
+## Libraries
+
+This is the reference native Android wallet for SMART Health Check-in over W3C
 Digital Credentials API using direct `org-iso-mdoc` (specified in
-[`../spec.md`](../spec.md) §8 + Appendix A).
+[the spec](https://smart-health-checkin.org/spec/) §8 and Appendix A).
 
 The project is now split into library-shaped Gradle modules plus a demo app.
 The split is intended to make future Android wallet apps small: app code should
@@ -86,7 +92,7 @@ doctype:   org.smarthealthit.checkin.1
 ## Layout
 
 ```text
-wallet-android/
+android-wallet/
   settings.gradle
   build.gradle
   app/
@@ -128,7 +134,6 @@ wallet-android/
 ## Run the demo app
 
 ```sh
-cd wallet-android
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -151,14 +156,12 @@ compatibility. Use `-Pregistration-mode=modern-only` or
 Fast Android/JVM coverage:
 
 ```sh
-cd wallet-android
 ./gradlew :app:testDebugUnitTest --no-daemon
 ```
 
 Build smoke:
 
 ```sh
-cd wallet-android
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
@@ -189,7 +192,7 @@ outputs, issuer/device signing intermediates, and sidecar hex/base64url files.
 Pull and analyze the latest run:
 
 ```sh
-../scripts/pull-android-handler-run.sh
+../spec/scripts/pull-android-handler-run.sh   # in a sibling checkout of smart-health-checkin/spec
 ```
 
 For HPKE-open debugging, pair the Android bundle with the RP web console event
@@ -226,7 +229,7 @@ How big a response can this wallet return through the Digital Credentials
 API? It depends on which of two delivery modes the request lives in — a
 private handshake inside `androidx.credentials`, not anything in the W3C,
 OpenID, or ISO specs. Measured on a Pixel 11 Pro XL / Android 17 / Chrome 151
-(full write-up: [`../docs/research/10-android-response-size.md`](../docs/research/10-android-response-size.md)):
+(full write-up: [`docs/research/10-android-response-size.md`](https://github.com/smart-health-checkin/spec/blob/main/docs/research/10-android-response-size.md) in the spec repo):
 
 | Mode | When | Ceiling |
 | --- | --- | --- |
