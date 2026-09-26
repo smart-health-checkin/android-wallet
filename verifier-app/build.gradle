@@ -1,20 +1,34 @@
-// Spike: a native Android relying party that asks the wallet for a SMART Health
-// Check-in directly through Credential Manager — no browser in the loop.
+// Example: a native Android app as the Verifier for a SMART Health Check-in,
+// through the browser (Custom Tab + message channel) or directly (Credential Manager).
 plugins {
     id "com.android.application"
     id "org.jetbrains.kotlin.android"
 }
 
 android {
-    namespace "org.smarthealthit.checkin.rp"
+    namespace "org.smarthealthit.checkin.verifier"
     compileSdk 35
 
     defaultConfig {
-        applicationId "org.smarthealthit.checkin.rp"
+        applicationId "org.smarthealthit.checkin.verifier"
         minSdk 26
         targetSdk 35
         versionCode 1
         versionName "0.1.0"
+    }
+
+    // -Pdebug-keystore=<path>: sign with that keystore (standard debug alias and
+    // passwords). The shared key is the one /.well-known/assetlinks.json on
+    // smart-health-checkin.org lists, which the browser path requires.
+    if (project.hasProperty("debug-keystore")) {
+        signingConfigs {
+            debug {
+                storeFile file(project.property("debug-keystore").toString())
+                storePassword "android"
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+            }
+        }
     }
 
     compileOptions {
@@ -41,7 +55,7 @@ dependencies {
     implementation "androidx.credentials:credentials-play-services-auth:1.7.0-alpha03"
     implementation "androidx.activity:activity-ktx:1.10.0"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7"
-    implementation "androidx.browser:browser:1.8.0"          // Custom Tabs probe
+    implementation "androidx.browser:browser:1.8.0"          // Custom Tabs + message channel
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
 }
 

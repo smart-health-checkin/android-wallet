@@ -1,4 +1,4 @@
-package org.smarthealthit.checkin.rp
+package org.smarthealthit.checkin.verifier
 
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +13,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.credentials.CredentialManager
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -28,43 +27,49 @@ import org.smarthealthit.checkin.wallet.MdocCbor
 import org.smarthealthit.checkin.wallet.SmartMdocBase64
 import org.smarthealthit.checkin.wallet.SmartMdocCrypto
 import java.security.MessageDigest
+import java.util.UUID
 
 /**
- * Spike: can a native Android app be the relying party for a SMART Health
- * Check-in over the Digital Credentials API, with no browser in the loop?
+ * Example: a native Android app as the Verifier for a SMART Health Check-in.
  *
- * Three buttons, three answers:
- *  1. direct — `CredentialManager.getCredential(GetDigitalCredentialOption)`;
- *     Play services shows the same picker Chrome gets, the wallet answers, and
- *     this app decrypts the response itself.
- *  2. WebView — loads the web demo in a WebView and reports whether
- *     `navigator.credentials.get` / `DigitalCredential` exist there.
- *  3. Custom Tab — hands the web demo to Chrome; works, but the response lands
- *     in the web page, not in this app.
+ *  - "Check in through the browser" runs the web flow in a Custom Tab and gets
+ *    the result back over a message channel ([BrowserCheckin]). It reaches
+ *    every wallet a web page can: the phone's wallets and web wallets.
+ *  - "Check in with a wallet on this phone" calls Credential Manager directly,
+ *    with no browser. It reaches only the phone's wallets.
+ *
+ * Launch extras (used by the automated test): `request` (SMART request JSON)
+ * and `registry` (a wallet registry URL for the bridge page's picker).
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
-class RpMainActivity : ComponentActivity() {
+class VerifierActivity : ComponentActivity() {
     companion object {
-        const val TAG = "SHCRp"
-        const val DEMO_URL = "https://smart-health-checkin.org/client/demo/#wallet=platform"
+        const val TAG = "SHCVerifier"
+        val BRIDGE_URL: Uri = Uri.parse("https://smart-health-checkin.org/client/demo/native-bridge.html")
+        const val DEFAULT_REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json"
     }
 
     private lateinit var output: TextView
+    private lateinit var browserCheckin: BrowserCheckin
+    private var startedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        browserCheckin = BrowserCheckin(this, BRIDGE_URL, ::onBrowserResult).also { it.bind() }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 220, 32, 32)
+            setPadding(32, 160, 32, 32)
         }
-        fun button(label: String, onClick: () -> Unit) {
-            root.addView(Button(this).apply { text = label; setOnClickListener { onClick() } })
-        }
-        button("Request check-in via CredentialManager (direct)") { requestDirect() }
-        button("Open demo page in WebView") { startActivity(Intent(this, WebViewProbeActivity::class.java)) }
-        button("Open demo page in Custom Tab") {
-            CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(DEMO_URL))
-        }
+        root.addView(Button(this).apply {
+            text = "Check in through the browser"
+            contentDescription = "browser-checkin"
+            setOnClickListener { checkInThroughBrowser() }
+        })
+        root.addView(Button(this).apply {
+            text = "Check in with a wallet on this phone"
+            contentDescription = "direct-checkin"
+            setOnClickListener { checkInDirect() }
+        })
         output = TextView(this).apply {
             setTextIsSelectable(true)
             typeface = Typeface.MONOSPACE
@@ -72,101 +77,110 @@ class RpMainActivity : ComponentActivity() {
         }
         root.addView(ScrollView(this).apply { addView(output) }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
-        show(
-            "package: $packageName\n" +
-                "candidate origins the wallet might bind the SessionTranscript to:\n" +
-                candidateOrigins().joinToString("\n") { "  $it" },
-        )
+        show("Ready.")
+    }
+
+    /** The SMART request to send: the `request` extra, or the bundled example, with a fresh id. */
+    private fun smartRequest(): JSONObject {
+        val json = intent.getStringExtra("request") ?: assets.open("smart-request.json").bufferedReader().readText()
+        return JSONObject(json).put("id", "verifier-app-${UUID.randomUUID()}")
+    }
+
+    // ------------------------------------------------------------ through the browser
+
+    private fun checkInThroughBrowser() {
+        startedAt = SystemClock.elapsedRealtime()
+        show("Opening the bridge page…")
+        browserCheckin.start(smartRequest(), intent.getStringExtra("registry") ?: DEFAULT_REGISTRY)
+    }
+
+    private fun onBrowserResult(result: BrowserCheckin.Result) {
+        val ms = SystemClock.elapsedRealtime() - startedAt
+        // Come back to the front; this closes the Custom Tab above us.
+        startActivity(Intent(this, VerifierActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        when (result) {
+            is BrowserCheckin.Result.Completed -> {
+                val response = result.json.getJSONObject("response")
+                show("Received through the browser in $ms ms from ${result.json.optString("wallet")}: " +
+                    "${result.chars} chars in ${result.parts} part(s)\n\n" + summarize(response))
+                Log.i(TAG, "RESULT path=browser ok=true ms=$ms chars=${result.chars} parts=${result.parts} wallet=${result.json.optString("wallet")}")
+            }
+            BrowserCheckin.Result.Declined -> {
+                show("Nothing was shared.")
+                Log.i(TAG, "RESULT path=browser ok=false declined=true ms=$ms")
+            }
+            is BrowserCheckin.Result.Failed -> {
+                show("Failed: ${result.message}")
+                Log.i(TAG, "RESULT path=browser ok=false ms=$ms message=${result.message}")
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ directly, with no browser
+
+    private fun checkInDirect() {
+        val built = OrgIsoMdocRequestBuilder.build(smartRequest().toString())
+        val request = GetCredentialRequest(listOf(GetDigitalCredentialOption(built.requestJson)))
+        show("Asking the phone's wallets…")
+        val t0 = SystemClock.elapsedRealtime()
+        lifecycleScope.launch {
+            try {
+                val credential = CredentialManager.create(this@VerifierActivity).getCredential(this@VerifierActivity, request).credential
+                if (credential !is DigitalCredential) return@launch show("Unexpected credential type ${credential.type}")
+                val smartResponse = openDirectResponse(credential.credentialJson, built)
+                val ms = SystemClock.elapsedRealtime() - t0
+                show("Received directly in $ms ms\n\n" + summarize(JSONObject(smartResponse)))
+                Log.i(TAG, "RESULT path=direct ok=true ms=$ms chars=${smartResponse.length}")
+            } catch (e: GetCredentialException) {
+                show("Failed: ${e.type} ${e.message}")
+                Log.i(TAG, "RESULT path=direct ok=false type=${e.type}")
+            } catch (t: Throwable) {
+                show("Failed: $t")
+                Log.e(TAG, "direct check-in failed", t)
+            }
+        }
+    }
+
+    /**
+     * Opens the wallet's HPKE-sealed DeviceResponse and returns the SMART response JSON.
+     * The transcript's origin is this app's `android:apk-key-hash:` string (spec TR-2),
+     * because Android reports no web origin for an app caller. A production app would also
+     * verify the mdoc signatures and validate the response against its request (spec §8.5).
+     */
+    private fun openDirectResponse(credentialJson: String, built: OrgIsoMdocRequestBuilder.BuiltRequest): String {
+        val dcapi = MdocCbor.decode(SmartMdocBase64.decodeUrl(JSONObject(credentialJson).getJSONObject("data").getString("response"))) as List<*>
+        val fields = dcapi[1] as Map<*, *>
+        val transcript = DirectMdocRequestParser.buildSessionTranscript(built.encryptionInfoB64u, appOrigin())
+        val opened = SmartMdocCrypto.hpkeOpen(fields["enc"] as ByteArray, fields["cipherText"] as ByteArray, built.recipientKeyPair, transcript)
+        val document = ((MdocCbor.decode(opened) as Map<*, *>)["documents"] as List<*>)[0] as Map<*, *>
+        val items = ((document["issuerSigned"] as Map<*, *>)["nameSpaces"] as Map<*, *>)[OrgIsoMdocRequestBuilder.NAMESPACE] as List<*>
+        return (MdocCbor.decodeTag24(items[0]) as Map<*, *>)["elementValue"] as String
+    }
+
+    /** `android:apk-key-hash:` + base64url SHA-256 of this app's signing certificate. */
+    private fun appOrigin(): String {
+        val cert = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            .signingInfo!!.apkContentsSigners[0].toByteArray()
+        val digest = MessageDigest.getInstance("SHA-256").digest(cert)
+        return "android:apk-key-hash:" + Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+    }
+
+    // ------------------------------------------------------------ display
+
+    private fun summarize(response: JSONObject): String {
+        val statuses = response.getJSONArray("requestStatus")
+        val artifacts = response.getJSONArray("artifacts")
+        return buildString {
+            append("Items:\n")
+            for (i in 0 until statuses.length()) statuses.getJSONObject(i).let { append("  ${it.getString("item")}: ${it.getString("status")}\n") }
+            append("Artifacts: ${artifacts.length()}\n")
+            for (i in 0 until artifacts.length()) artifacts.getJSONObject(i).let {
+                append("  ${it.getString("id")} ${it.getString("mediaType")} → ${it.getJSONArray("fulfills").join(", ")}\n")
+            }
+        }
     }
 
     private fun show(text: String) {
         output.text = text
-        Log.i(TAG, text.replace('\n', ' ').take(400))
-    }
-
-    private fun requestDirect() {
-        val smartRequestJson = assets.open("smart-request.json").bufferedReader().readText()
-        val built = OrgIsoMdocRequestBuilder.build(smartRequestJson)
-        val request = GetCredentialRequest(listOf(GetDigitalCredentialOption(built.requestJson)))
-        show("requesting… requestJson=${built.requestJson.length} chars")
-        val t0 = SystemClock.elapsedRealtime()
-        lifecycleScope.launch {
-            try {
-                val response = CredentialManager.create(this@RpMainActivity)
-                    .getCredential(this@RpMainActivity, request)
-                val ms = SystemClock.elapsedRealtime() - t0
-                val credential = response.credential
-                if (credential is DigitalCredential) {
-                    handleResponse(credential.credentialJson, built, ms)
-                } else {
-                    show("FAILED: unexpected credential type ${credential.type}")
-                }
-            } catch (e: GetCredentialException) {
-                val ms = SystemClock.elapsedRealtime() - t0
-                show("FAILED after ${ms} ms: ${e::class.java.simpleName} type=${e.type} message=${e.message}")
-                Log.w(TAG, "getCredential failed", e)
-            } catch (t: Throwable) {
-                show("FAILED: $t")
-                Log.e(TAG, "getCredential threw", t)
-            }
-        }
-    }
-
-    private fun handleResponse(credentialJson: String, built: OrgIsoMdocRequestBuilder.BuiltRequest, ms: Long) {
-        val json = JSONObject(credentialJson)
-        val protocol = json.optString("protocol")
-        val responseB64u = json.getJSONObject("data").getString("response")
-        val dcapi = MdocCbor.decode(SmartMdocBase64.decodeUrl(responseB64u)) as List<*>
-        val fields = dcapi[1] as Map<*, *>
-        val enc = fields["enc"] as ByteArray
-        val cipherText = fields["cipherText"] as ByteArray
-
-        // The wallet binds the HPKE info to a SessionTranscript built from the
-        // origin it derived for us; we don't know which convention it used, so
-        // try each — AES-GCM fails authentication on the wrong one.
-        var opened: ByteArray? = null
-        var usedOrigin: String? = null
-        for (origin in candidateOrigins()) {
-            val transcript = DirectMdocRequestParser.buildSessionTranscript(built.encryptionInfoB64u, origin)
-            try {
-                opened = SmartMdocCrypto.hpkeOpen(enc, cipherText, built.recipientKeyPair, transcript)
-                usedOrigin = origin
-                break
-            } catch (_: Exception) {
-            }
-        }
-        if (opened == null) {
-            show("response received in ${ms} ms (protocol=$protocol, ${credentialJson.length} chars) but HPKE open failed for every candidate origin")
-            return
-        }
-        val deviceResponse = MdocCbor.decode(opened) as Map<*, *>
-        val document = (deviceResponse["documents"] as List<*>)[0] as Map<*, *>
-        val issuerNamespaces = (document["issuerSigned"] as Map<*, *>)["nameSpaces"] as Map<*, *>
-        val items = issuerNamespaces[OrgIsoMdocRequestBuilder.NAMESPACE] as List<*>
-        val item = MdocCbor.decodeTag24(items[0]) as Map<*, *>
-        val smartResponse = item["elementValue"] as String
-        val pretty = runCatching { JSONObject(smartResponse).toString(2) }.getOrDefault(smartResponse)
-        show(
-            "OK in ${ms} ms\n" +
-                "protocol=$protocol credentialJson=${credentialJson.length} chars\n" +
-                "SessionTranscript origin that decrypted: $usedOrigin\n" +
-                "docType=${document["docType"]} smartResponse=${smartResponse.length} chars\n\n" +
-                pretty.take(4000),
-        )
-        Log.i(TAG, "RESULT ok=true ms=$ms credentialJsonChars=${credentialJson.length} origin=$usedOrigin smartResponseChars=${smartResponse.length}")
-    }
-
-    /** The conventions in circulation for "origin" of an app-invoked request. */
-    private fun candidateOrigins(): List<String> {
-        val cert = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-            .signingInfo!!.apkContentsSigners[0].toByteArray()
-        val digest = MessageDigest.getInstance("SHA-256").digest(cert)
-        val b64url = Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        val b64 = Base64.encodeToString(digest, Base64.NO_WRAP or Base64.NO_PADDING)
-        return listOf(
-            "android:apk-key-hash:$b64url",   // Android holder docs / Multipaz / Google Wallet (base64url)
-            "android:apk-key-hash:$b64",      // Android holder docs snippet (standard base64)
-            "android-app:$packageName",       // this repo's wallet fallback today
-        )
     }
 }

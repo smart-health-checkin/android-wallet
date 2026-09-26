@@ -1,21 +1,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lets the app find the browser's Custom Tabs service on Android 11+. -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@android:drawable/sym_def_app_icon"
-        android:label="SMART Check-in RP (native)"
+        android:label="SMART Check-in Verifier"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".RpMainActivity"
-            android:exported="true">
+            android:name=".VerifierActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".WebViewProbeActivity"
-            android:exported="false" />
+        <!-- Carries the Custom Tabs message channel (androidx.browser). -->
+        <service
+            android:name="androidx.browser.customtabs.PostMessageService"
+            android:exported="true" />
     </application>
 </manifest>

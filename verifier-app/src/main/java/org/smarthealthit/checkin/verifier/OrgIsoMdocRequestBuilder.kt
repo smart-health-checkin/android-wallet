@@ -1,4 +1,4 @@
-package org.smarthealthit.checkin.rp
+package org.smarthealthit.checkin.verifier
 
 import org.json.JSONArray
 import org.json.JSONObject

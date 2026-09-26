@@ -1,35 +1,28 @@
-# rp-app — native Android relying party (spike)
+# verifier-app: a native Android app as the Verifier
 
-Answers "can a native app request a SMART Health Check-in from the wallet
-without a browser?" — yes. Findings and sources:
-[`../../docs/research/11-native-rp-android.md`](../../docs/research/11-native-rp-android.md).
+An example of a native app asking for a SMART Health Check-in. The developer
+guide is [Native apps](https://smart-health-checkin.org/client/docs/native-apps.html).
 
-Three buttons:
+| Button | What it does | Reaches |
+| --- | --- | --- |
+| Check in through the browser | Opens the [bridge page](https://smart-health-checkin.org/client/demo/native-bridge.html) in a Custom Tab, sends it the request over a Custom Tabs message channel, and gets the checked response back the same way, in parts ([`BrowserCheckin`](src/main/java/org/smarthealthit/checkin/verifier/BrowserCheckin.kt)). | The phone's wallets and web wallets |
+| Check in with a wallet on this phone | Calls `CredentialManager.getCredential(GetDigitalCredentialOption(…))` directly and decrypts the response here, with the transcript bound to this app's `android:apk-key-hash:` origin. | The phone's wallets |
 
-| Button | What it shows |
-| --- | --- |
-| Request check-in via CredentialManager (direct) | `CredentialManager.getCredential(GetDigitalCredentialOption(requestJson))` → Play services picker → wallet → response decrypted here and printed. ~8 s, two taps. |
-| Open demo page in WebView | the web demo inside a WebView: `DigitalCredential` is absent, the page says so. |
-| Open demo page in Custom Tab | the web demo in Chrome: works, but the response stays in the page. |
-
-Pieces:
-
-- `OrgIsoMdocRequestBuilder` — the `org-iso-mdoc` request (DeviceRequest with
-  the SMART request in `requestInfo`, `encryptionInfo` with a fresh P-256
-  recipient key), same wire shape `rp-web` builds. Fixture SMART request in
-  `src/main/assets/smart-request.json`.
-- `RpMainActivity` — the call, then HPKE-open with
-  `SmartMdocCrypto.hpkeOpen` using a SessionTranscript built for each
-  app-origin convention in circulation (`android:apk-key-hash:` base64url /
-  base64, `android-app:<package>`) and reports which one the wallet used.
-  No MSO/COSE verification (spike).
-- `WebViewProbeActivity` — feature probe + console capture for the WebView row.
+The browser path needs the bridge page's site to list this app in
+`/.well-known/assetlinks.json` (`delegate_permission/common.use_as_origin`).
+smart-health-checkin.org lists `org.smarthealthit.checkin.verifier` signed with
+the shared key, so build with it:
 
 ```sh
-./gradlew :rp-app:assembleDebug
-adb install -r rp-app/build/outputs/apk/debug/rp-app-debug.apk
-python3 tools/payload-probe/rp_drive.py     # drives the direct flow hands-free, prints both sides' logs
+./gradlew :verifier-app:assembleDebug -Pdebug-keystore=<path to the shared debug keystore>
+adb install -r verifier-app/build/outputs/apk/debug/verifier-app-debug.apk
 ```
 
-Needs `androidx.credentials:credentials-play-services-auth` (the verifier call
-is always routed to Play services) and a device with Play services ≥ 24.31.
+Launch extras, used by the automated test: `request` (a SMART request as JSON)
+and `registry` (the wallet registry the bridge page's picker loads; default:
+the connectathon registry). Each result is logged as
+`SHCVerifier: RESULT path=browser|direct ok=… ms=… chars=…`.
+
+The direct button's transcript origin follows spec TR-2 (`android:apk-key-hash:`).
+The reference wallet switches to that format in its next release; until then
+the direct button's responses from it won't decrypt.
