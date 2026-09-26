@@ -2,15 +2,15 @@ name: Release
 
 # Builds the reference Android wallet and the example native Verifier app
 # (verifier-app/) as debuggable APKs and publishes both as a GitHub release.
-# Both are signed with the same debug key (repository secret
+# Both are signed with the same shared development key (repository secret
 # ANDROID_DEBUG_KEYSTORE_B64, certificate SHA-256 84643eb6…): each release
 # installs over the last, and smart-health-checkin.org's
 # /.well-known/assetlinks.json lists the Verifier app with that certificate.
 # The build fails if either APK has any other signer.
 #
 # Stable download links for the latest release:
-#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk
-#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier-app.apk
+#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet.apk
+#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier.apk
 on:
   push:
     tags: ["v*"]
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - uses: gradle/actions/setup-gradle@v4
-      - name: Install the fixed debug signing key
+      - name: Install the shared development signing key
         run: |
           echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/debug.keystore"
           [ -s "$RUNNER_TEMP/debug.keystore" ] || { echo "ANDROID_DEBUG_KEYSTORE_B64 is empty"; exit 1; }
@@ -53,15 +53,15 @@ jobs:
           fi
           ./gradlew :app:assembleDebug :verifier-app:assembleDebug -Pskip-matcher -Pdebug-keystore="$RUNNER_TEMP/debug.keystore" \
             -PversionCode=$VERSION_CODE -PversionName="$VERSION_NAME"
-          cp app/build/outputs/apk/debug/app-debug.apk smart-health-checkin-wallet-debug.apk
-          cp verifier-app/build/outputs/apk/debug/verifier-app-debug.apk smart-health-checkin-verifier-app.apk
+          cp app/build/outputs/apk/debug/app-debug.apk smart-health-checkin-wallet.apk
+          cp verifier-app/build/outputs/apk/debug/verifier-app-debug.apk smart-health-checkin-verifier.apk
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Signed with the shared key
         # A release signed with any other key can't install over earlier ones,
         # and a Verifier app with any other key doesn't match assetlinks.json.
         run: |
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
-          for apk in smart-health-checkin-wallet-debug.apk smart-health-checkin-verifier-app.apk; do
+          for apk in smart-health-checkin-wallet.apk smart-health-checkin-verifier.apk; do
             "$APKSIGNER" verify --print-certs "$apk" | tee /dev/stderr \
               | grep -q "SHA-256 digest: 84643eb69bc95a2dc4ec2d4d92af77a64a8cb00f0e2c7b99bce393cee202dda4" \
               || { echo "$apk is not signed with the shared key"; exit 1; }
@@ -72,16 +72,16 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           [ "$GITHUB_REF_TYPE" = tag ] || TAG="v$VERSION_NAME"
-          gh release create "$TAG" smart-health-checkin-wallet-debug.apk smart-health-checkin-verifier-app.apk \
+          gh release create "$TAG" smart-health-checkin-wallet.apk smart-health-checkin-verifier.apk \
             --title "Reference Android wallet v$VERSION_NAME" \
-            --notes "Debuggable build of the SMART Health Check-in reference Android wallet.
+            --notes "Debuggable build of the SMART Health Check-in reference Android wallet, signed with the project's shared development key.
 
           Install on the phone by opening the APK link, or with adb:
 
-              curl -LO https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk
-              adb install -r smart-health-checkin-wallet-debug.apk
+              curl -LO https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet.apk
+              adb install -r smart-health-checkin-wallet.apk
 
           Requires Android 8 or later and a Chrome with the Digital Credentials API. Open the app once after installing so it registers with Credential Manager.
 
-          smart-health-checkin-verifier-app.apk is the example native Verifier app (verifier-app/): it asks for a check-in by calling Credential Manager directly, or through the bridge page in a Custom Tab to reach web wallets too. See https://smart-health-checkin.org/client/docs/native-apps.html." \
+          smart-health-checkin-verifier.apk is the example native Verifier app (verifier-app/): it asks for a check-in by calling Credential Manager directly, or through the bridge page in a Custom Tab to reach web wallets too. See https://smart-health-checkin.org/client/docs/native-apps.html." \
             --latest

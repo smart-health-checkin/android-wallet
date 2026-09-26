@@ -9,8 +9,8 @@ guide is [Native apps](https://smart-health-checkin.org/client/docs/native-apps.
 | Check in with a wallet on this phone | Calls `CredentialManager.getCredential(GetDigitalCredentialOption(…))` directly and decrypts the response here, with the transcript bound to this app's `android:apk-key-hash:` origin. | The phone's wallets |
 
 Install the latest release on a phone or emulator:
-<https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier-app.apk>
-(`adb install -r smart-health-checkin-verifier-app.apk`). It is signed with the
+<https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier.apk>
+(`adb install -r smart-health-checkin-verifier.apk`). It is signed with the
 shared key, so the browser path works as released.
 
 The browser path needs the bridge page's site to list this app in
@@ -19,7 +19,7 @@ smart-health-checkin.org lists `org.smarthealthit.checkin.verifier` signed with
 the shared key, so a local build must use it too:
 
 ```sh
-./gradlew :verifier-app:assembleDebug -Pdebug-keystore=<path to the shared debug keystore>
+./gradlew :verifier-app:assembleDebug -Pdebug-keystore=<path to the shared development keystore>
 adb install -r verifier-app/build/outputs/apk/debug/verifier-app-debug.apk
 ```
 
