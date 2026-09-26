@@ -18,7 +18,7 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   or RP.
 - Build: `./gradlew :app:assembleDebug --no-daemon`.
 - **Releasing:** push tag `vX.Y.Z`; `android-release.yml` builds, signs,
-  and attaches the APK. Links everywhere use `releases/latest/download/`, so
+  and attaches both APKs (the wallet and `verifier-app`). Links everywhere use `releases/latest/download/`, so
   nothing else needs updating. Never re-tag.
 - Test vectors come from the client library, pinned to a release tarball in
   `package.json`: `bun install && bun run vectors`.
@@ -32,8 +32,9 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   the apex's `/.well-known/assetlinks.json`; change that file if either changes.
 - Signing: every release and `verifier-app` use the shared debug key from the
   `ANDROID_DEBUG_KEYSTORE_B64` secret. versionCode comes from the version
-  (`0.4.1` -> 4001), so versions must only grow. The APK is
-  `smart-health-checkin-wallet-debug.apk`.
+  (`0.4.1` -> 4001), so versions must only grow. The APKs are
+  `smart-health-checkin-wallet-debug.apk` and
+  `smart-health-checkin-verifier-app.apk`.
 - App callers' origin is `android:apk-key-hash:<base64url SHA-256 of the signing
   cert>` (spec TR-2); browser callers' origin comes from `getOrigin` with the
   privileged-caller allowlist.

@@ -2,6 +2,8 @@
 
 Download the latest build: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk>
 
+The example native Verifier app ([`verifier-app`](verifier-app/README.md)) is attached to the same release: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier-app.apk>
+
 This repo was split out of [smart-health-checkin/spec](https://github.com/smart-health-checkin/spec) with its history. Unit tests read the spec's fixtures and conformance cases at a pinned tag (`SPEC_REF` in [`scripts/fetch-spec.sh`](scripts/fetch-spec.sh), currently `v1.0.0-draft.1`); Gradle's test tasks fetch them into the gitignored `fixtures/` and `spec-conformance/` first. Set `SPEC_DIR=../spec` to test against a local spec checkout. Test vectors are generated from the client library: `bun install && bun run vectors`.
 
 ## Libraries

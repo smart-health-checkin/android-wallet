@@ -13,8 +13,9 @@ android {
         applicationId "org.smarthealthit.checkin.verifier"
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
+        // Releases pass -PversionCode and -PversionName, the same as the wallet's.
+        versionCode((project.findProperty("versionCode") ?: "1").toString().toInteger())
+        versionName((project.findProperty("versionName") ?: "0.1.0").toString())
     }
 
     // -Pdebug-keystore=<path>: sign with that keystore (standard debug alias and
