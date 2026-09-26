@@ -23,6 +23,9 @@ and `registry` (the wallet registry the bridge page's picker loads; default:
 the connectathon registry). Each result is logged as
 `SHCVerifier: RESULT path=browser|direct ok=… ms=… chars=…`.
 
-The direct button's transcript origin follows spec TR-2 (`android:apk-key-hash:`).
-The reference wallet switches to that format in its next release; until then
-the direct button's responses from it won't decrypt.
+The direct button's transcript origin follows spec TR-2 (`android:apk-key-hash:`),
+which the reference wallet uses for app callers from v0.4.0.
+
+`bun tools/verifier-app-e2e/run.ts` runs three cases: `direct` (reference wallet
+v0.4.0+ installed), `small`, and `large` (through the browser, answered by the
+SMART Testing Wallet).

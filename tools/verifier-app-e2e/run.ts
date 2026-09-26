@@ -5,6 +5,9 @@
 //
 //   bun tools/verifier-app-e2e/run.ts [--apk verifier-app-debug.apk] [--serial emulator-5554] [--port 9477] [small] [large]
 //
+// direct: the app's second button, Credential Manager with no browser, answered by
+//        the reference Android wallet (v0.4.0 or later: it binds app callers to
+//        android:apk-key-hash:, which the app decrypts with).
 // small: the app's bundled request, answered as the testing wallet's small patient.
 // large: the connectathon's L2 request (anything in USCDI), answered as the
 //        testing wallet's large patient (over 2 MB).
@@ -18,7 +21,7 @@ const opt = (name: string) => { const i = args.indexOf(name); return i >= 0 ? ar
 const SERIAL = opt("--serial") ?? "emulator-5554";
 const PORT = Number(opt("--port") ?? 9477);
 const APK = opt("--apk");
-const CASES = args.length ? args : ["small", "large"];
+const CASES = args.length ? args : ["direct", "small", "large"];
 const PKG = "org.smarthealthit.checkin.verifier";
 const REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json";
 const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/baseline-4.json";
@@ -48,7 +51,42 @@ async function waitFor<T>(what: string, ms: number, fn: () => Promise<T | undefi
   throw new Error(`timed out waiting for ${what}`);
 }
 
+/** Tap the first on-screen node whose text matches; returns whether it tapped. */
+async function tapText(re: RegExp): Promise<boolean> {
+  await adb("shell", "uiautomator", "dump", "/sdcard/ui.xml");
+  const xml = (await adb("shell", "cat", "/sdcard/ui.xml")).stdout.toString();
+  for (const m of xml.matchAll(/text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g)) {
+    if (!re.test(m[1]!)) continue;
+    await adb("shell", "input", "tap", String((+m[2]! + +m[4]!) >> 1), String((+m[3]! + +m[5]!) >> 1));
+    return true;
+  }
+  return false;
+}
+
+async function runDirect(): Promise<boolean> {
+  await adb("logcat", "-c");
+  await adb("shell", `am start -S --activity-clear-task -n ${PKG}/.VerifierActivity`);
+  await sleep(2500);
+  const t0 = Date.now();
+  await tapByDescription("direct-checkin");
+  // The platform's sheet, then the wallet's consent screen.
+  for (const end = Date.now() + 120000; Date.now() < end; await sleep(1500)) {
+    const log = (await adb("logcat", "-d", "-s", "SHCVerifier:I")).stdout.toString();
+    const result = log.match(/RESULT path=direct (.*)/)?.[1];
+    if (result) {
+      const ok = /ok=true/.test(result);
+      console.log(`${ok ? "ok  " : "FAIL"} direct: ${((Date.now() - t0) / 1000).toFixed(1)} s total; app: ${result}`);
+      return ok;
+    }
+    // Share first: the wallet's screen also shows the text "SMART Health Check-in".
+    if (!(await tapText(/^Share selected data$/))) await tapText(/^(Agree and continue|Continue)$/);
+  }
+  console.log("FAIL direct: no result within 120 s");
+  return false;
+}
+
 async function runCase(name: string): Promise<boolean> {
+  if (name === "direct") return runDirect();
   const request = name === "large" ? JSON.stringify(await (await fetch(L2_REQUEST)).json()) : undefined;
   await adb("shell", "am", "force-stop", PKG);
   await adb("logcat", "-c");
