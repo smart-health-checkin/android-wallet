@@ -9,3 +9,4 @@ captures/
 .DS_Store
 node_modules/
 !fixtures/captures/
+!fixtures/captures/
