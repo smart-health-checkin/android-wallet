@@ -1,6 +1,6 @@
 # Agent notes: android-wallet
 
-The sample Android wallet. Released as an APK from `wallet-vX.Y.Z` tags.
+The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
 [MAINTAINING.md](https://github.com/smart-health-checkin/smart-health-checkin.github.io/blob/main/MAINTAINING.md) maps every repo, what triggers what, and how to release.
 
 - Test: `./gradlew :app:testDebugUnitTest --no-daemon`. Test tasks fetch the
@@ -18,7 +18,7 @@ The sample Android wallet. Released as an APK from `wallet-vX.Y.Z` tags.
 - Names follow the spec: Verifier, Wallet, Holder. Not Responder, Requester,
   or RP.
 - Build: `./gradlew :app:assembleDebug --no-daemon`.
-- **Releasing:** push tag `wallet-vX.Y.Z`; `android-release.yml` builds, signs,
+- **Releasing:** push tag `vX.Y.Z`; `android-release.yml` builds, signs,
   and attaches the APK. Links everywhere use `releases/latest/download/`, so
   nothing else needs updating. Never re-tag.
 - Test vectors come from the client library, pinned to a release tarball in

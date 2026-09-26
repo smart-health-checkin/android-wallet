@@ -1,4 +1,4 @@
-name: Android wallet release
+name: Release
 
 # Builds the reference Android wallet as a debuggable APK and publishes it as a
 # GitHub release. Every release is signed with the same debug key (repository
@@ -9,7 +9,7 @@ name: Android wallet release
 #   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk
 on:
   push:
-    tags: ["wallet-v*"]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
           # (whose releases reached versionCode 5). Untagged dev builds use
           # the run number and stay below every release.
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            VERSION_NAME="${GITHUB_REF_NAME#wallet-v}"
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
             IFS=. read -r MAJOR MINOR PATCH <<< "${VERSION_NAME%%-*}"
             VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))
           else
@@ -62,7 +62,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          [ "$GITHUB_REF_TYPE" = tag ] || TAG="wallet-v$VERSION_NAME"
+          [ "$GITHUB_REF_TYPE" = tag ] || TAG="v$VERSION_NAME"
           gh release create "$TAG" smart-checkin-wallet-debug.apk \
             --title "Reference Android wallet $VERSION_NAME" \
             --notes "Debuggable build of the SMART Health Check-in reference Android wallet.
