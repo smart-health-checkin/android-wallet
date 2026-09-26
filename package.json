@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vectors": "bun run app/src/test/resources/gen-test-vectors.ts"
+    "vectors": "scripts/fetch-fixtures.sh && bun run app/src/test/resources/gen-test-vectors.ts"
   },
   "dependencies": {
     "@smart-health-checkin/client": "github:smart-health-checkin/client"

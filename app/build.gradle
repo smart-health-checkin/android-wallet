@@ -113,6 +113,16 @@ tasks.register("copyMatcherWasm", Copy) {
     }
 }
 
+// The spec's conformance fixtures, at the tag pinned in scripts/fetch-fixtures.sh.
+// Unit tests read them from ../fixtures.
+tasks.register("fetchFixtures", Exec) {
+    workingDir rootProject.projectDir
+    commandLine "bash", "scripts/fetch-fixtures.sh"
+}
+tasks.withType(Test).configureEach {
+    dependsOn "fetchFixtures"
+}
+
 afterEvaluate {
     tasks.named("preBuild").configure {
         dependsOn "copyMatcherWasm"

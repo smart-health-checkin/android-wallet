@@ -8,5 +8,7 @@ local.properties
 captures/
 .DS_Store
 node_modules/
-!fixtures/captures/
-!fixtures/captures/
+
+# The spec's fixtures, fetched by tag (scripts/fetch-fixtures.sh)
+fixtures/
+.cache/
