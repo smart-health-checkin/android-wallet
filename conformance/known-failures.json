@@ -1,0 +1,28 @@
+{
+  "claims": [
+    "request-json",
+    "request-cbor",
+    "transcript",
+    "wallet-response"
+  ],
+  "notClaimed": {
+    "response-json": "Wallet side: the wallet builds responses; it doesn't validate other responses.",
+    "cross-validation": "Wallet side: verifiers cross-validate.",
+    "hpke-open": "Wallet side: the wallet seals; the rp-app demo opens, but it isn't a library under test.",
+    "mdoc-verify": "Wallet side: verifiers check the mdoc layer."
+  },
+  "knownFailures": {
+    "request-json/version-number": "SmartRequestAdapter uses optString, so the number 1 reads as \"1\"",
+    "request-json/mixed-form-with-profiles": "SmartRequest.kt allows selection fields on form.fhir",
+    "request-json/mixed-selection-with-questionnaire": "SmartRequest.kt allows questionnaire fields on selection.fhir",
+    "request-json/canonical-not-string": "SmartRequest.kt coerces a number canonical to a string",
+    "request-json/profiles-from-string": "SmartRequest.kt accepts a bare string for profilesFrom",
+    "request-json/empty-profiles": "SmartRequest.kt accepts empty profiles[]",
+    "request-json/empty-resource-types": "SmartRequest.kt accepts empty resourceTypes[]",
+    "request-cbor/wrong-protocol": "DirectMdocRequest.kt also accepts protocol org.iso.mdoc",
+    "request-cbor/padded-base64url": "SmartMdocBase64 accepts padding",
+    "request-cbor/intent-not-bool": "MdocCbor.kt coerces a non-boolean intentToRetain to false",
+    "request-cbor/unknown-version": "MdocCbor.kt doesn't check DeviceRequest version",
+    "request-cbor/encryption-key-wrong-curve": "SmartMdocCrypto.publicKeyFromCose doesn't check kty/crv"
+  }
+}

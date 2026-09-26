@@ -15,3 +15,8 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew test -Pskip-matcher
+      # wallet-response conformance cases: the tests above write the credentials
+      # this wallet built; the reference verifier (the client library) checks them.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun spec-conformance/reference/verify-wallet-output.ts app/build/conformance-wallet conformance/known-failures.json

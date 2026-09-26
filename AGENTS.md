@@ -6,6 +6,13 @@ The sample Android wallet. Released as an APK from `wallet-vX.Y.Z` tags.
 - Test: `./gradlew :app:testDebugUnitTest --no-daemon`. Test tasks fetch the
   spec's fixtures at the pinned tag first (`scripts/fetch-fixtures.sh`,
   `SPEC_FIXTURES_REF`).
+- Conformance: `ConformanceTest` runs the spec's conformance cases
+  (`request-json`, `request-cbor`, `transcript`, `wallet-response`; pinned by
+  `SPEC_CONFORMANCE_REF` in `scripts/fetch-conformance.sh`). Credentials built
+  for `wallet-response` land in `app/build/conformance-wallet/`, and CI checks
+  them with `bun spec-conformance/reference/verify-wallet-output.ts
+  app/build/conformance-wallet conformance/known-failures.json`.
+  `conformance/known-failures.json` lists what fails today and must shrink.
 - Build: `./gradlew :app:assembleDebug --no-daemon`.
 - **Releasing:** push tag `wallet-vX.Y.Z`; `android-release.yml` builds, signs,
   and attaches the APK. Links everywhere use `releases/latest/download/`, so

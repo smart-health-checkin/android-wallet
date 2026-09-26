@@ -134,8 +134,16 @@ tasks.register("fetchFixtures", Exec) {
     workingDir rootProject.projectDir
     commandLine "bash", "scripts/fetch-fixtures.sh"
 }
+tasks.register("fetchConformance", Exec) {
+    workingDir rootProject.projectDir
+    commandLine "bash", "scripts/fetch-conformance.sh"
+}
 tasks.withType(Test).configureEach {
     dependsOn "fetchFixtures"
+    dependsOn "fetchConformance"
+    // The conformance cases are read from outside the source set; rerun when they change.
+    inputs.dir(rootProject.file("spec-conformance")).withPropertyName("specConformance").optional()
+    inputs.file(rootProject.file("conformance/known-failures.json")).withPropertyName("conformanceKnownFailures")
 }
 
 afterEvaluate {
