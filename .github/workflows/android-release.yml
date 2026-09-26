@@ -50,13 +50,13 @@ jobs:
           ./gradlew :app:assembleDebug -Pskip-matcher -Pdebug-keystore="$RUNNER_TEMP/debug.keystore" \
             -PversionCode=$VERSION_CODE -PversionName="$VERSION_NAME"
           cp app/build/outputs/apk/debug/app-debug.apk smart-health-checkin-wallet-debug.apk
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Signed with the shared key
         # A release signed with any other key can't install over earlier ones.
         run: |
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           "$APKSIGNER" verify --print-certs smart-health-checkin-wallet-debug.apk | tee /dev/stderr \
             | grep -q "SHA-256 digest: 84643eb69bc95a2dc4ec2d4d92af77a64a8cb00f0e2c7b99bce393cee202dda4"
-          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
