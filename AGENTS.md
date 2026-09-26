@@ -24,3 +24,16 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   `package.json`: `bun install && bun run vectors`.
 - connectathon's nightly Android run installs the latest release, so a broken
   release shows up there within a day.
+- `verifier-app/` is the example native Verifier: the direct Credential Manager
+  path and the browser path through the client's bridge page. Its end-to-end
+  test is `tools/verifier-app-e2e/run.ts` (local only; needs an emulator with
+  Chrome; runs the direct, small, and large cases). Its package
+  (`org.smarthealthit.checkin.verifier`) and signing certificate are listed in
+  the apex's `/.well-known/assetlinks.json`; change that file if either changes.
+- Signing: every release and `verifier-app` use the shared debug key from the
+  `ANDROID_DEBUG_KEYSTORE_B64` secret. versionCode comes from the version
+  (`0.4.1` -> 4001), so versions must only grow. The APK is
+  `smart-health-checkin-wallet-debug.apk`.
+- App callers' origin is `android:apk-key-hash:<base64url SHA-256 of the signing
+  cert>` (spec TR-2); browser callers' origin comes from `getOrigin` with the
+  privileged-caller allowlist.
