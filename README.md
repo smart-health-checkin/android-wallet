@@ -1,6 +1,6 @@
 # SMART Health Check-in Android wallet
 
-Download the latest build: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk>
+Download the latest build: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk>
 
 This repo was split out of [smart-health-checkin/spec](https://github.com/smart-health-checkin/spec) with its history. Unit tests read the spec's conformance fixtures at a pinned tag (`SPEC_FIXTURES_REF` in [`scripts/fetch-fixtures.sh`](scripts/fetch-fixtures.sh), currently `fixtures-v2`); Gradle's test tasks fetch them into the gitignored `fixtures/` first. Set `SPEC_FIXTURES_DIR=../spec/fixtures` to test against a local spec checkout. Test vectors are generated from the client library: `bun install && bun run vectors`.
 

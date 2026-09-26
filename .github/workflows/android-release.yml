@@ -6,7 +6,7 @@ name: Release
 # one installs over the last; the build fails if the APK has any other signer.
 #
 # Stable download link for the latest release:
-#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk
+#   https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk
 on:
   push:
     tags: ["v*"]
@@ -49,12 +49,12 @@ jobs:
           fi
           ./gradlew :app:assembleDebug -Pskip-matcher -Pdebug-keystore="$RUNNER_TEMP/debug.keystore" \
             -PversionCode=$VERSION_CODE -PversionName="$VERSION_NAME"
-          cp app/build/outputs/apk/debug/app-debug.apk smart-checkin-wallet-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk smart-health-checkin-wallet-debug.apk
       - name: Signed with the shared key
         # A release signed with any other key can't install over earlier ones.
         run: |
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
-          "$APKSIGNER" verify --print-certs smart-checkin-wallet-debug.apk | tee /dev/stderr \
+          "$APKSIGNER" verify --print-certs smart-health-checkin-wallet-debug.apk | tee /dev/stderr \
             | grep -q "SHA-256 digest: 84643eb69bc95a2dc4ec2d4d92af77a64a8cb00f0e2c7b99bce393cee202dda4"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - name: Publish the release
@@ -63,14 +63,14 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           [ "$GITHUB_REF_TYPE" = tag ] || TAG="v$VERSION_NAME"
-          gh release create "$TAG" smart-checkin-wallet-debug.apk \
-            --title "Reference Android wallet $VERSION_NAME" \
+          gh release create "$TAG" smart-health-checkin-wallet-debug.apk \
+            --title "Reference Android wallet v$VERSION_NAME" \
             --notes "Debuggable build of the SMART Health Check-in reference Android wallet.
 
           Install on the phone by opening the APK link, or with adb:
 
-              curl -LO https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-checkin-wallet-debug.apk
-              adb install -r smart-checkin-wallet-debug.apk
+              curl -LO https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet-debug.apk
+              adb install -r smart-health-checkin-wallet-debug.apk
 
           Requires Android 8 or later and a Chrome with the Digital Credentials API. Open the app once after installing so it registers with Credential Manager." \
             --latest
