@@ -31,6 +31,7 @@ the connectathon registry). Each result is logged as
 The direct button's transcript origin follows spec TR-2 (`android:apk-key-hash:`),
 which the reference wallet uses for app callers from v0.4.0.
 
-`bun tools/verifier-app-e2e/run.ts` runs three cases: `direct` (reference wallet
+`bun tools/verifier-app-e2e/run.ts` runs five cases: `direct` (reference wallet
 v0.4.0+ installed), `small`, and `large` (through the browser, answered by the
-SMART Testing Wallet).
+SMART Testing Wallet), and `repeat` (two browser check-ins) and `mixed` (browser,
+direct, browser), each in one app process.

@@ -27,7 +27,8 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
 - `verifier-app/` is the example native Verifier: the direct Credential Manager
   path and the browser path through the client's bridge page. Its end-to-end
   test is `tools/verifier-app-e2e/run.ts` (local only; needs an emulator with
-  Chrome; runs the direct, small, and large cases). Its package
+  Chrome; runs the direct, small, large, repeat, and mixed cases; repeat and
+  mixed run several check-ins in one app process). Its package
   (`org.smarthealthit.checkin.verifier`) and signing certificate are listed in
   the apex's `/.well-known/assetlinks.json`; change that file if either changes.
 - Signing: every release and `verifier-app` use the shared debug key from the

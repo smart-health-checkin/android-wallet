@@ -28,6 +28,7 @@ import org.smarthealthit.checkin.wallet.SmartMdocBase64
 import org.smarthealthit.checkin.wallet.SmartMdocCrypto
 import java.security.MessageDigest
 import java.util.UUID
+import javax.crypto.AEADBadTagException
 
 /**
  * Example: a native Android app as the Verifier for a SMART Health Check-in.
@@ -78,6 +79,11 @@ class VerifierActivity : ComponentActivity() {
         root.addView(ScrollView(this).apply { addView(output) }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
         show("Ready.")
+    }
+
+    override fun onDestroy() {
+        browserCheckin.unbind()
+        super.onDestroy()
     }
 
     /** The SMART request to send: the `request` extra, or the bundled example, with a fresh id. */
@@ -135,8 +141,15 @@ class VerifierActivity : ComponentActivity() {
                 show("Failed: ${e.type} ${e.message}")
                 Log.i(TAG, "RESULT path=direct ok=false type=${e.type}")
             } catch (t: Throwable) {
-                show("Failed: $t")
+                // AEADBadTagException (BAD_DECRYPT): the wallet sealed the answer to a different
+                // transcript, usually a wallet older than v0.4.2, from before android:apk-key-hash: origins.
+                val plain = if (generateSequence(t) { it.cause }.any { it is AEADBadTagException || it.message?.contains("BAD_DECRYPT") == true }) {
+                    "This wallet's answer couldn't be opened by this app. The wallet may be out of date, " +
+                        "or it sealed the answer for a different origin.\n\n"
+                } else ""
+                show("${plain}Failed: $t")
                 Log.e(TAG, "direct check-in failed", t)
+                Log.i(TAG, "RESULT path=direct ok=false error=$t")
             }
         }
     }

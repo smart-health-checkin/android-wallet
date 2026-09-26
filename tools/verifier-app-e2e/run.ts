@@ -3,7 +3,7 @@
 // with a web wallet (the SMART Testing Wallet), and the checked response must
 // arrive back in the app over the Custom Tabs message channel.
 //
-//   bun tools/verifier-app-e2e/run.ts [--apk verifier-app-debug.apk] [--serial emulator-5554] [--port 9477] [small] [large]
+//   bun tools/verifier-app-e2e/run.ts [--apk verifier-app-debug.apk] [--serial emulator-5554] [--port 9477] [small] [large] [repeat] [mixed]
 //
 // direct: the app's second button, Credential Manager with no browser, answered by
 //        the reference Android wallet (v0.4.0 or later: it binds app callers to
@@ -11,6 +11,8 @@
 // small: the app's bundled request, answered as the testing wallet's small patient.
 // large: the connectathon's L2 request (anything in USCDI), answered as the
 //        testing wallet's large patient (over 2 MB).
+// repeat: two small check-ins through the browser in a row, in one app process.
+// mixed: browser, direct, browser, in one app process (direct needs the reference wallet).
 // Needs: adb, Chrome on the device with a network connection, puppeteer-core
 // (bun install), and the app signed with the key assetlinks.json lists.
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
@@ -21,7 +23,9 @@ const opt = (name: string) => { const i = args.indexOf(name); return i >= 0 ? ar
 const SERIAL = opt("--serial") ?? "emulator-5554";
 const PORT = Number(opt("--port") ?? 9477);
 const APK = opt("--apk");
-const CASES = args.length ? args : ["direct", "small", "large"];
+const CASES = args.length ? args : ["direct", "small", "large", "repeat", "mixed"];
+/** Cases that run several steps without restarting the app between them. */
+const SEQUENCES: Record<string, string[]> = { repeat: ["small", "small"], mixed: ["small", "direct", "small"] };
 const PKG = "org.smarthealthit.checkin.verifier";
 const REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json";
 const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/baseline-4.json";
@@ -37,6 +41,18 @@ async function tapByDescription(desc: string) {
   const [x, y] = [(+m[1]! + +m[3]!) >> 1, (+m[2]! + +m[4]!) >> 1];
   await adb("shell", "input", "tap", String(x), String(y));
 }
+
+/** Ids of Chrome's open tabs (none if Chrome isn't running yet). */
+async function tabIds(): Promise<Set<string>> {
+  await adb("forward", `tcp:${PORT}`, "localabstract:chrome_devtools_remote");
+  try {
+    const list = await (await fetch(`http://localhost:${PORT}/json/list`, { signal: AbortSignal.timeout(3000) })).json() as { id: string }[];
+    return new Set(list.map((t) => t.id));
+  } catch {
+    return new Set();
+  }
+}
+const tabId = (p: Page) => (p.target() as unknown as { _targetId: string })._targetId;
 
 const appLog = async () => (await adb("logcat", "-d", "-s", "SHCVerifier:I", "SHCBrowserCheckin:I")).stdout.toString();
 
@@ -63,10 +79,18 @@ async function tapText(re: RegExp): Promise<boolean> {
   return false;
 }
 
-async function runDirect(): Promise<boolean> {
+/** Start the app in a fresh process, or (fresh=false) keep the running one, which is in front after its last result. */
+async function launch(fresh: boolean, extras = "") {
   await adb("logcat", "-c");
-  await adb("shell", `am start -S --activity-clear-task -n ${PKG}/.VerifierActivity`);
+  if (!fresh) return sleep(1500);
+  await adb("shell", "am", "force-stop", PKG);
+  // A fresh task, so no Custom Tab from an earlier run sits on top of the app.
+  await adb("shell", `am start -S --activity-clear-task -n ${PKG}/.VerifierActivity ${extras}`);
   await sleep(2500);
+}
+
+async function runDirect(fresh = true): Promise<boolean> {
+  await launch(fresh);
   const t0 = Date.now();
   await tapByDescription("direct-checkin");
   // The platform's sheet, then the wallet's consent screen.
@@ -86,14 +110,24 @@ async function runDirect(): Promise<boolean> {
 }
 
 async function runCase(name: string): Promise<boolean> {
-  if (name === "direct") return runDirect();
+  const steps = SEQUENCES[name];
+  if (!steps) return runStep(name, true);
+  // Launch extras stay on the app's intent, so every browser step uses the registry.
+  for (const [i, step] of steps.entries()) {
+    const ok = await runStep(step, i === 0).catch((e) => { console.log(`FAIL ${name} step ${i + 1} (${step}): ${(e as Error).message}`); return false; });
+    if (!ok) return false;
+  }
+  console.log(`ok   ${name}: ${steps.join(", ")} in one app process`);
+  return true;
+}
+
+async function runStep(name: string, fresh: boolean): Promise<boolean> {
+  if (name === "direct") return runDirect(fresh);
   const request = name === "large" ? JSON.stringify(await (await fetch(L2_REQUEST)).json()) : undefined;
-  await adb("shell", "am", "force-stop", PKG);
-  await adb("logcat", "-c");
   const extras = `--es registry ${REGISTRY}` + (request ? ` --es request '${request.replace(/'/g, "'\\''")}'` : "");
-  // A fresh task, so no Custom Tab from an earlier run sits on top of the app.
-  await adb("shell", `am start -S --activity-clear-task -n ${PKG}/.VerifierActivity ${extras}`);
-  await sleep(2500);
+  await launch(fresh, extras);
+  // Tabs already open (an earlier step's wallet tab stays open in Chrome) aren't this step's.
+  const earlier = await tabIds();
   const t0 = Date.now();
   await tapByDescription("browser-checkin");
 
@@ -113,7 +147,7 @@ async function runCase(name: string): Promise<boolean> {
         [...document.getElementById("picker")!.shadowRoot!.querySelectorAll("button")].find((e) => /SMART Testing Wallet/.test(e.innerText)) ?? null)).asElement() ?? undefined);
     await (button as unknown as { click(): Promise<void> }).click();
     const wallet: Page = await waitFor("the wallet tab", 30000, async () =>
-      (await browser.pages()).find((p) => p.url().includes("/testing-wallet/")));
+      (await browser.pages()).find((p) => !earlier.has(tabId(p)) && p.url().includes("/testing-wallet/")));
     const hasOpener = await wallet.evaluate(() => !!window.opener);
     await wallet.waitForFunction(() => { const s = document.getElementById("share") as HTMLButtonElement | null; return !!s && !s.disabled && !document.getElementById("consent")!.hidden; }, { timeout: 60000 });
     if (name === "large") {
