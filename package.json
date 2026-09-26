@@ -7,7 +7,7 @@
     "e2e:verifier-app": "bun tools/verifier-app-e2e/run.ts"
   },
   "dependencies": {
-    "@smart-health-checkin/client": "https://github.com/smart-health-checkin/client/releases/download/v0.4.2/smart-health-checkin-client-0.4.2.tgz"
+    "@smart-health-checkin/client": "https://github.com/smart-health-checkin/client/releases/download/v0.4.3/smart-health-checkin-client-0.4.3.tgz"
   },
   "devDependencies": {
     "@types/bun": "latest",
