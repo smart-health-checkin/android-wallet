@@ -14,7 +14,7 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   for `wallet-response` land in `app/build/conformance-wallet/`, and CI checks
   them with `bun spec-conformance/reference/verify-wallet-output.ts
   app/build/conformance-wallet conformance/known-failures.json`.
-  `conformance/known-failures.json` lists what fails today (empty as of W5); the
+  `conformance/known-failures.json` lists what fails today (empty); the
   runner also checks per-item `unsupported` outcomes and that every expected
   warning is reported.
 - Names follow the spec: Verifier, Wallet, Holder. Not Responder, Requester,
@@ -41,5 +41,5 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   `smart-health-checkin-wallet.apk` and
   `smart-health-checkin-verifier.apk`.
 - App callers' origin is `android:apk-key-hash:<base64url SHA-256 of the signing
-  cert>` (spec TR-2); browser callers' origin comes from `getOrigin` with the
+  cert>` ([spec TR-2](https://smart-health-checkin.org/spec/#TR-2)); browser callers' origin comes from `getOrigin` with the
   privileged-caller allowlist.

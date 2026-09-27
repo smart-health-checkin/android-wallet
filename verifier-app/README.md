@@ -10,8 +10,8 @@ guide is [Native Verifier apps](https://smart-health-checkin.org/client/docs/nat
 
 Install the latest release on a phone or emulator:
 <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier.apk>
-(`adb install -r smart-health-checkin-verifier.apk`). It is signed with the
-shared key, so the browser path works as released.
+(`adb install -r smart-health-checkin-verifier.apk` after downloading it). It is
+signed with the shared development key, so the browser path works as released.
 
 The browser path needs the bridge page's site to list this app in
 `/.well-known/assetlinks.json` (`delegate_permission/common.use_as_origin`).
@@ -28,10 +28,11 @@ and `registry` (the wallet registry the bridge page's picker loads; default:
 the connectathon registry). Each result is logged as
 `SHCVerifier: RESULT path=browser|direct ok=… ms=… chars=…`.
 
-The direct button's transcript origin follows spec TR-2 (`android:apk-key-hash:`),
-which the reference wallet uses for app callers from v0.4.0.
+The direct button's transcript origin follows spec
+[TR-2](https://smart-health-checkin.org/spec/#TR-2) (`android:apk-key-hash:`),
+which the reference wallet uses for app callers.
 
-`bun tools/verifier-app-e2e/run.ts` runs five cases: `direct` (reference wallet
-v0.4.0+ installed), `small`, and `large` (through the browser, answered by the
+`bun tools/verifier-app-e2e/run.ts` runs five cases: `direct` (with the reference
+wallet installed), `small`, and `large` (through the browser, answered by the
 SMART Testing Wallet), and `repeat` (two browser check-ins) and `mixed` (browser,
 direct, browser), each in one app process.

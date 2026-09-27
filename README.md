@@ -4,7 +4,7 @@ Download the latest build: <https://github.com/smart-health-checkin/android-wall
 
 The example native Verifier app ([`verifier-app`](verifier-app/README.md)) is attached to the same release: <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier.apk>
 
-This repo was split out of [smart-health-checkin/spec](https://github.com/smart-health-checkin/spec) with its history. Unit tests read the spec's fixtures and conformance cases at a pinned tag (`SPEC_REF` in [`scripts/fetch-spec.sh`](scripts/fetch-spec.sh), currently `v1.0.0-draft.1`); Gradle's test tasks fetch them into the gitignored `fixtures/` and `spec-conformance/` first. Set `SPEC_DIR=../spec` to test against a local spec checkout. Test vectors are generated from the client library: `bun install && bun run vectors`.
+Unit tests read the spec's fixtures and conformance cases at a pinned tag (`SPEC_REF` in [`scripts/fetch-spec.sh`](scripts/fetch-spec.sh), currently `v1.0.0-draft.1`); Gradle's test tasks fetch them into the gitignored `fixtures/` and `spec-conformance/` first. Set `SPEC_DIR=../spec` to test against a local spec checkout. Test vectors are generated from the client library: `bun install && bun run vectors`.
 
 ## Libraries
 
@@ -12,11 +12,10 @@ This is the reference native Android wallet for SMART Health Check-in over W3C
 Digital Credentials API using direct `org-iso-mdoc` (specified in
 [the spec](https://smart-health-checkin.org/spec/) [§8](https://smart-health-checkin.org/spec/#8-same-device-presentation-flow) and [Appendix A](https://smart-health-checkin.org/spec/#appendix-a-worked-example)).
 
-The project is now split into library-shaped Gradle modules plus a demo app.
-The split is intended to make future Android wallet apps small: app code should
-provide holder data and UI decisions, while library code handles SMART request
-parsing, mdoc transport, Credential Manager registration, and reusable Compose
-screens.
+The project is a set of library-shaped Gradle modules plus a demo app, so that
+an Android wallet app stays small: app code provides holder data and UI
+decisions, and library code handles SMART request parsing, mdoc transport,
+Credential Manager registration, and reusable Compose screens.
 
 ## Module map
 
@@ -43,8 +42,8 @@ app
   -> all four library modules
 ```
 
-The package name is still `org.smarthealthit.checkin.wallet` across modules to
-minimize churn while the APIs stabilize. Android namespaces differ by module.
+Every module uses the package name `org.smarthealthit.checkin.wallet`; Android
+namespaces differ by module.
 
 ## End-to-end flow
 
@@ -96,8 +95,8 @@ doctype:   org.smarthealthit.checkin.1
   mixed form and selection members, a malformed filter array) makes only that
   item `unsupported`. A `selection.fhir` item with no filters is answered from
   the wallet's records. A profile the wallet has no category for is matched by
-  `meta.profile` and answered `unavailable` if nothing matches. Old selector
-  members such as `canonical` and `resource` are ignored.
+  `meta.profile` and answered `unavailable` if nothing matches. Members the spec
+  doesn't define are ignored ([JSON-3](https://smart-health-checkin.org/spec/#JSON-3)).
 - **Versioned canonicals** ([§5.5](https://smart-health-checkin.org/spec/#5-5-canonical-version-handling)): a versioned form is fetched from its bare
   URL and used only if the Questionnaire's `url` and `version` match exactly. A
   versioned profile is fulfilled only by records whose `meta.profile` names that
@@ -109,7 +108,7 @@ doctype:   org.smarthealthit.checkin.1
   reports the page's origin. A native app calling directly gets
   `android:apk-key-hash:<base64url SHA-256 of its signing certificate>`
   (`AppCallerOrigin`), which the app computes the same way for its transcript.
-- **The response** (§8.4): a detached device signature, an MSO with
+- **The response** ([§8.4](https://smart-health-checkin.org/spec/#8-4-wallet-request-handling-and-response-construction)): a detached device signature, an MSO with
   `validityInfo`, and only media types the item accepts.
 
 ## Stack
@@ -117,8 +116,9 @@ doctype:   org.smarthealthit.checkin.1
 - AGP 8.7.3, Kotlin 2.0.21, Java 17.
 - minSdk 26, target/compileSdk 35.
 - Compose BOM 2024.12.01 for the UI module.
-- `androidx.credentials` and `androidx.credentials.registry-provider`
-  snapshots from `https://androidx.dev/snapshots/latest/artifacts/repository`.
+- `androidx.credentials` 1.7.0-alpha03 and `androidx.credentials.registry`
+  1.0.0-alpha05, with a pinned androidx.dev snapshot repository in
+  `settings.gradle`.
 - BouncyCastle in `smart-checkin-mdoc` for COSE/certificate/crypto helpers.
 
 ## Layout
@@ -165,23 +165,31 @@ android-wallet/
 
 ## Run the demo app
 
+It needs Android 8 or later, with a Chrome version that has the Digital
+Credentials API. Install the [release APK](https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-wallet.apk),
+or build and install your own:
+
 ```sh
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-First launch:
+A local build is signed with your own debug key, so uninstall a release build
+first (`adb uninstall org.smarthealthit.checkin.wallet`).
 
-1. Open the app.
-2. Tap **Register with Credential Manager**.
-3. Open the web verifier in a browser with Digital Credentials support.
-4. Request SMART Health Check-in information.
-5. Choose the wallet entry, review requested sharing, and accept.
+1. Open the app once. It registers with Credential Manager, and the home screen
+   says it's ready for check-in requests. Choose the test patient there: Aria
+   Test, or the large record.
+2. In Chrome on the same phone, open the
+   [Testing EHR](https://smart-health-checkin.org/connectathon/testing-ehr/) or
+   the [clinic check-in demo](https://smart-health-checkin.org/client/demo/)
+   and start a check-in with the phone's own wallet.
+3. Choose SMART Health Check-in in the phone's sheet, review what's asked, and
+   share.
 
-The app currently registers both modern `DigitalCredential.TYPE_DIGITAL_CREDENTIAL`
-and legacy `com.credman.IdentityCredential` entries by default for browser
-compatibility. Use `-Pregistration-mode=modern-only` or
-`-Pregistration-mode=legacy-only` to narrow registration behavior.
+The app registers both a `DigitalCredential.TYPE_DIGITAL_CREDENTIAL` entry and
+a `com.credman.IdentityCredential` entry, so browsers that look for either one
+find it.
 
 ## Validation commands
 
@@ -197,10 +205,12 @@ Build smoke:
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
-Full direct-mdoc response validation:
+Full direct-mdoc response validation, from a checkout of
+[smart-health-checkin/spec](https://github.com/smart-health-checkin/spec) next
+to this one:
 
 ```sh
-cd ..
+cd ../spec
 bash vendor/scripts/validate-android-mdoc-response.sh
 ```
 
@@ -233,13 +243,19 @@ for offline inspection.
 
 ## Sample data
 
-Bundled under `app/src/main/assets/demo-data/`:
+The two test patients, the same as the connectathon's SMART Testing Wallet,
+are in `app/src/main/assets/reference-patients/`: `aria-test.json` and
+`large-record.json` (over 2 MB, for large responses).
+
+More demo data is bundled under `app/src/main/assets/demo-data/`:
 
 - `carin-coverage.json`: CARIN-IG Coverage resource.
 - `clinical-history-bundle.json`: US Core clinical history bundle.
 - `migraine-questionnaire.json`: Chronic Migraine follow-up Questionnaire.
 - `migraine-autofill-values.json`: prefill values keyed by Questionnaire linkId.
 - `sbc-insurance-plan.json`: Summary of Benefits and Coverage resource.
+- `smart-health-card.json`: a SMART Health Card.
+- `headache-summary.md`: a patient-written headache summary.
 
 `DemoWalletStore` is demo-specific. Production apps should replace it with a
 real holder data source that implements `SmartHealthWalletStore`.
@@ -278,7 +294,7 @@ request's option `requestData` — plus the process heap cap and a rough
 `setGetCredentialResponse`, `ResponseDelivery.wentOutOfBand(intent)` says which
 way the response actually went. The sample takes no action on it yet; the
 point is that a wallet *can* know, before building the response, whether it
-is in a ~500 KB world or a tens-of-MB world, and could offer narrower
+is limited to about 520 KB or can send tens of MB, and could offer narrower
 selections or return a pointer (a SMART Health Link) instead of bytes.
 
 Sweep it yourself with [`tools/payload-probe/`](tools/payload-probe/README.md).

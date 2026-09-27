@@ -38,11 +38,11 @@ Tells a provider activity which delivery mode its request lives in.
 `ResponseDelivery.describe(request)` → `callerAcceptsLargePayloads` (the caller
 put a large-payload `ResultReceiver` in the request; Chrome ≥ 150 does),
 `heapMaxMB`, and a rough `budgetChars` (~200 K chars on the Intent-extra path,
-whose ~500 KB parcel cliff fails silently; tens of MB out of band).
+whose parcel limit of about 520 KB fails silently; tens of MB out of band).
 `ResponseDelivery.wentOutOfBand(intent)` after `setGetCredentialResponse`.
 Always call the three-argument `PendingIntentHandler.setGetCredentialResponse(intent, response, request)`;
 the two-argument overload is deprecated and pins you to the Intent-extra path.
-See the root README's "Response size and delivery modes".
+See [Response size and delivery modes](../README.md#response-size-and-delivery-modes) in the root README.
 
 ## What registration carries
 
