@@ -63,10 +63,6 @@ val readerAuth = direct.readerAuth
 - SessionTranscript can be reconstructed from `encryptionInfo` and origin;
 - readerAuth is verified when present.
 
-The v1.0 protocol string is exactly `org-iso-mdoc`. Any local compatibility for
-older wrapper spellings is diagnostic behavior, not SMART Health Check-in 1.0
-wire compatibility.
-
 ## Response flow
 
 Build SMART response JSON in `smart-checkin-core`, then pass it to the mdoc

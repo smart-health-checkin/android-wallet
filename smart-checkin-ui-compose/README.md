@@ -1,33 +1,21 @@
 # smart-checkin-ui-compose
 
-`smart-checkin-ui-compose` is the optional Compose UI layer for the Android
-wallet. It depends on the core models and can call the registration adapter, but
-it should not own protocol parsing, HPKE, CBOR, or holder-data policy.
+`smart-checkin-ui-compose` holds the wallet's Compose screens. It works with
+the models from `smart-checkin-core` and calls the registration adapter in
+`smart-checkin-credential-manager`; request parsing, encryption, and
+holder-data lookup live in the other modules.
 
-The current module still contains demo-oriented UI code from the original
-single-app prototype. The boundary is useful now, and the next hardening step is
-to split stable reusable components from demo-only `MainActivity` scaffolding.
+## What this module contains
 
-## What this module owns
+- `MainActivity`: the launcher's home screen. It registers the wallet with
+  Credential Manager and shows the result, lets the holder choose the
+  reference patient, and imports and browses health records.
+- `DemoApp`: the holder review screen that `HandlerActivity` shows for each
+  request. It lists the requested items and the matching records, renders
+  Questionnaire items as input controls, and ends with Share or Decline.
+- `SampleHealthTheme`: the colors and type used by both screens.
 
-- `MainActivity`: launcher/home screen for the demo app.
-- Registration UI state and button flow.
-- `SampleHealthTheme`.
-- Consent/review UI state and helper composables preserved from the demo.
-- Questionnaire input rendering helpers for common FHIR Questionnaire item
-  types.
-
-## What this module should not own
-
-- SMART request validation or classification: use `smart-checkin-core`.
-- Holder-data lookup: implement `SmartHealthWalletStore` in the app or wallet
-  data module.
-- Direct mdoc parsing or response encryption: use `smart-checkin-mdoc`.
-- Credential Manager registration internals: use
-  `smart-checkin-credential-manager`.
-- Backend/kiosk session state.
-
-## Registration home example
+## Registration on the home screen
 
 The launcher screen calls:
 
@@ -43,12 +31,12 @@ registration = when (val r = Registration.register(this@MainActivity)) {
 }
 ```
 
-This keeps the UI responsible for presenting status while the registration
-module owns registry-provider calls.
+The screen presents the status; the registration module makes the
+registry-provider calls.
 
-## Consent UI model
+## The review screen's model
 
-Consent screens consume `VerifiedRequest` and `RequestItem` from
+The review screen reads `VerifiedRequest` and `RequestItem` from
 `smart-checkin-core`:
 
 ```kotlin
@@ -61,40 +49,17 @@ data class VerifiedRequest(
 )
 ```
 
-Each `RequestItem` includes a UI title/subtitle, `RequestKind`, raw metadata,
-and accepted media types. The UI can show a user-friendly review without
-knowing how the request was carried over mdoc.
+Each `RequestItem` has a title and subtitle, a `RequestKind`, the item's
+metadata, and the media types it accepts, so the screen can describe the
+request without knowing how it was carried over mdoc.
 
-The displayed Verifier origin is one presentation-layer signal, not Verifier or
-organization identity by itself. UI trust labels should keep origin, readerAuth,
-issuer/device evidence, clinical-source provenance, Holder choice, and local
-policy decisions separate.
+The Verifier's origin shown on the screen is what the browser or Android
+reported; it does not by itself establish who the Verifier or its
+organization is. Keep the origin, readerAuth status, and the holder's choices
+as separate facts on the screen.
 
-## Future reusable components
+## Dependencies
 
-The intended stable React-like/Compose renderer kit should expose small
-components such as:
-
-- request summary header;
-- verifier/readerAuth status row;
-- request item list with required/optional state;
-- FHIR resource/profile-family request cards;
-- Questionnaire prompt renderer;
-- selected/declined item review;
-- response artifact/status preview;
-- debug/evidence panel for demos.
-
-Those components should accept core models and callbacks. They should not
-perform protocol parsing, Credential Manager calls, or wallet-store lookups.
-
-## Dependency rules
-
-This module can depend on:
-
-- `smart-checkin-core` for models;
-- `smart-checkin-credential-manager` for launcher registration UI;
-- Compose/Material/lifecycle libraries.
-
-It currently depends on `smart-checkin-mdoc` because the demo UI module is still
-coarse-grained. As the UI is hardened, direct mdoc imports should move into the
-app/handler layer so reusable UI components remain transport-neutral.
+The module depends on `smart-checkin-core`, `smart-checkin-mdoc`,
+`smart-checkin-credential-manager`, and the Compose, Material 3, and
+lifecycle libraries.

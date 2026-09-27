@@ -24,7 +24,7 @@ Credential Manager registration, and reusable Compose screens.
 | `smart-checkin-core` | SMART request/response domain model, request classification, response building, QuestionnaireResponse building, wallet-store interface. | [`smart-checkin-core/README.md`](smart-checkin-core/README.md) |
 | `smart-checkin-mdoc` | Direct `org-iso-mdoc` request parsing, SessionTranscript, readerAuth verification, CBOR, COSE, HPKE-sealed wallet response. | [`smart-checkin-mdoc/README.md`](smart-checkin-mdoc/README.md) |
 | `smart-checkin-credential-manager` | Android Credential Manager / registry-provider registration for the wallet entry and matcher bytes. | [`smart-checkin-credential-manager/README.md`](smart-checkin-credential-manager/README.md) |
-| `smart-checkin-ui-compose` | Compose demo/reusable UI layer: registration home, holder review screens, Questionnaire rendering helpers, theme/state. | [`smart-checkin-ui-compose/README.md`](smart-checkin-ui-compose/README.md) |
+| `smart-checkin-ui-compose` | Compose screens: the home screen (registration, test patient, record import) and the holder review screen with Questionnaire input. | [`smart-checkin-ui-compose/README.md`](smart-checkin-ui-compose/README.md) |
 | `app` | Demo app shell: manifest, `HandlerActivity`, sample wallet store, bundled demo assets, matcher build/copy tasks, end-to-end wiring. | This file |
 | `verifier-app` | Example: a native app as the Verifier, through the browser (Custom Tab and message channel, reaching web wallets too) or directly through Credential Manager. | [`verifier-app/README.md`](verifier-app/README.md) |
 
@@ -300,11 +300,3 @@ selections or return a pointer (a SMART Health Link) instead of bytes.
 Sweep it yourself with [`tools/payload-probe/`](tools/payload-probe/README.md).
 The `-Plarge-heap` build property requests the larger heap for those
 experiments; the default build does not.
-
-## Next library hardening work
-
-- Turn `HandlerActivity` orchestration into a smaller public handler API.
-- Split stable reusable Compose components from demo-only `MainActivity` code.
-- Add production holder-store examples beyond `DemoWalletStore`.
-- Add a server/kiosk sample that consumes the same request/response model.
-- Clean app dependencies that are now provided by library modules.
