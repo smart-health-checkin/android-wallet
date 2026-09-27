@@ -12,10 +12,12 @@ import androidx.credentials.provider.ProviderGetCredentialRequest
  * [androidx.credentials.provider.PendingIntentHandler.setGetCredentialResponse]
  * (`androidx.credentials` 1.7 or later). When the caller put a `ResultReceiver`
  * in the request under [EXTRA_LARGE_PAYLOAD_RESULT_RECEIVER] (current Chrome
- * does), androidx writes a large response to an unlinked temp file and hands
- * the caller a file descriptor, so responses of any size get through.
- * Otherwise the response rides in the result `Intent`. The deprecated
- * two-argument overload always uses the `Intent`.
+ * does), androidx writes the response to an unlinked temp file and hands the
+ * caller a file descriptor, so responses of any size get through. androidx
+ * still keeps a small response in the result `Intent`; [wentOutOfBand] says
+ * which way it went. When the caller offers no `ResultReceiver`, the response
+ * rides in the result `Intent`. The deprecated two-argument overload always
+ * uses the `Intent`.
  *
  * The three-argument overload picks the path by itself, so a wallet needs
  * nothing from this class to be correct. It lets a wallet see which path a
@@ -35,25 +37,12 @@ object ResponseDelivery {
     const val EXTRA_PASS_IT_BY_RESULT_RECEIVER =
         "androidx.credentials.provider.EXTRA_PASS_IT_BY_RESULT_RECEIVER"
 
-    /** Below this parcel size androidx keeps the response on the Intent even in large-payload mode. */
-    const val LARGE_PAYLOAD_PIVOT_BYTES = 200 * 1024
-
-    /** Reported as [ResponseDeliveryMode.budgetChars] on the Intent path. Logged only; nothing enforces it. */
-    const val LEGACY_BUDGET_CHARS = 200_000
-
-    /** Reported as [ResponseDeliveryMode.budgetChars] on the file path. Logged only; nothing enforces it. */
-    const val LARGE_PAYLOAD_BUDGET_CHARS = 20_000_000
-
     data class ResponseDeliveryMode(
         /** The caller offered a large-payload `ResultReceiver`; androidx hands large responses over as a file. */
         val callerAcceptsLargePayloads: Boolean,
         /** Wallet's managed-heap cap for this process, in MB (`Runtime.maxMemory()`). */
         val heapMaxMB: Long,
     ) {
-        /** A rough `credentialJson` length for this path. Logged only; nothing enforces it. */
-        val budgetChars: Int
-            get() = if (callerAcceptsLargePayloads) LARGE_PAYLOAD_BUDGET_CHARS else LEGACY_BUDGET_CHARS
-
         val label: String
             get() = if (callerAcceptsLargePayloads) "large-payload" else "intent-extra (legacy)"
     }
