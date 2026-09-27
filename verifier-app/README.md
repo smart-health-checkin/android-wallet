@@ -40,6 +40,13 @@ The direct button's transcript origin follows spec
 [TR-2](https://smart-health-checkin.org/spec/#TR-2) (`android:apk-key-hash:`),
 which the reference wallet uses for app callers.
 
+The app declares smart-health-checkin.org in an `asset_statements` resource
+(`res/values/strings.xml`, referenced from the manifest's `<meta-data>`). With the
+site's `assetlinks.json` listing the app back, wallets that check both directions,
+such as the reference wallet from 0.4.6, show "An app linked to
+smart-health-checkin.org is asking" instead of the app's package name
+([Native Verifier apps](https://smart-health-checkin.org/client/docs/native-apps.html#how-wallets-name-your-app)).
+
 `bun tools/verifier-app-e2e/run.ts` runs five cases: `direct` (with the reference
 wallet installed), `small`, and `large` (through the browser, answered by the
 SMART Testing Wallet), and `repeat` (two browser check-ins) and `mixed` (browser,

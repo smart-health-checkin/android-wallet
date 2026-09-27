@@ -113,6 +113,17 @@ doctype:   org.smarthealthit.checkin.1
   reports the page's origin. A native app calling directly gets
   `android:apk-key-hash:<base64url SHA-256 of its signing certificate>`
   (`AppCallerOrigin`), which the app computes the same way for its transcript.
+- **Who is asking** ([Platform notes](https://smart-health-checkin.org/spec/platform-notes.html#app-callers)):
+  the consent screen names a browser caller by its origin. It names an app caller
+  only by websites that pass a two-way Digital Asset Links check (`AssetLinks`,
+  `AppCallerIdentity`): the app declares the site in its `asset_statements`
+  meta-data, and the site's `/.well-known/assetlinks.json` lists the app's package
+  and signing-certificate fingerprint with `use_as_origin`, `handle_all_urls`, or
+  `get_login_creds`. The check runs in the background, HTTPS only with no
+  redirects, and answers are cached for an hour. Otherwise the screen says the app
+  isn't linked to a verified website. The package name, the app's own label, and
+  the `android:apk-key-hash:` origin appear only under Technical details. Reading
+  the caller's manifest needs `QUERY_ALL_PACKAGES`.
 - **The response** ([§8.4](https://smart-health-checkin.org/spec/#8-4-wallet-request-handling-and-response-construction)): a detached device signature, an MSO with
   `validityInfo`, and only media types the item accepts.
 

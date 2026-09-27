@@ -1,5 +1,13 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- To read the manifest of an app that calls the wallet (its asset_statements,
+         label, and installer; see AppCallerIdentity). Android 11+ hides other apps'
+         packages otherwise, and the calling app is not known in advance. Google Play
+         reviews apps that request this permission. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <application
         android:allowBackup="false"

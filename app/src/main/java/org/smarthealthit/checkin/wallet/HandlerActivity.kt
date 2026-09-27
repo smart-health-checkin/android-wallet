@@ -51,6 +51,7 @@ class HandlerActivity : ComponentActivity() {
 
     private var screenState by mutableStateOf<ScreenState>(ScreenState.Loading("Reading request", "Decoding the SMART Health Check-in request."))
     private var verifiedRequest: VerifiedRequest? = null
+    private var callerIdentity by mutableStateOf<CallerIdentity?>(null)
     private var directMdocRequest: DirectMdocRequest? = null
     private var providerRequest: ProviderGetCredentialRequest? = null
     private var itemResolutions: List<RequestItemResolution> = emptyList()
@@ -93,6 +94,7 @@ class HandlerActivity : ComponentActivity() {
             WalletTheme {
                 DemoApp(
                     state = screenState,
+                    caller = callerIdentity,
                     selectedItems = selectedItems,
                     selectedCandidates = selectedCandidates,
                     questionnaireAnswers = questionnaireAnswers,
@@ -132,6 +134,7 @@ class HandlerActivity : ComponentActivity() {
                 "pkg=${callingAppInfo.packageName} selectedEntryId=$selectedEntryId " +
                 "originError=${originResolution.error}",
         )
+        identifyCaller(callingAppInfo, originResolution)
 
         // Whether the caller accepts a large response as a file. This sample
         // only logs it; see ResponseDelivery.
@@ -199,6 +202,49 @@ class HandlerActivity : ComponentActivity() {
                 }
             appendToDebugBundle("smart-request.hydrated.json", hydratedSmartJson.toString(2))
             prepareConsent(origin, hydratedSmartJson, parsed.readerAuth, parsed.itemsRequest.requestCarrierDebug)
+        }
+    }
+
+    /**
+     * What the consent screen shows as who is asking. A browser caller is its web
+     * origin. An app caller is named only by websites that pass the two-way Digital
+     * Asset Links check ([AppCallerIdentity]), which runs in the background while the
+     * rest of the request loads; the screen shows "Checking" until it finishes. This
+     * is display only: the session transcript keeps the `android:apk-key-hash:` origin.
+     */
+    private fun identifyCaller(callingAppInfo: CallingAppInfo, originResolution: OriginResolution) {
+        if (originResolution.source == "web-origin") {
+            callerIdentity = CallerIdentity.Website(originResolution.origin)
+            return
+        }
+        val packageName = callingAppInfo.packageName
+        callerIdentity = CallerIdentity.App(originResolution.origin, packageName, null, null, AppLinkStatus.Checking)
+        lifecycleScope.launch {
+            val local = withContext(Dispatchers.IO) {
+                AppCallerIdentity.readLocal(packageManager, packageName, callingAppInfo.signingInfoCompat)
+            }
+            fun identity(check: AppLinkStatus) = CallerIdentity.App(
+                protocolOrigin = originResolution.origin,
+                packageName = packageName,
+                appLabel = local.label,
+                installer = local.installer,
+                check = check,
+            )
+            callerIdentity = identity(AppLinkStatus.Checking)
+            val done = AppCallerIdentity.check(local)
+            callerIdentity = identity(done)
+            appendToDebugBundle(
+                "caller-identity.json",
+                JSONObject()
+                    .put("packageName", packageName)
+                    .put("appLabel", local.label ?: JSONObject.NULL)
+                    .put("installer", local.installer ?: JSONObject.NULL)
+                    .put("certFingerprints", JSONArray(local.certFingerprints))
+                    .put("declaredSites", JSONArray(done.declaredSites))
+                    .put("verifiedSites", JSONArray(done.verifiedSites))
+                    .put("results", JSONArray(done.results))
+                    .toString(2),
+            )
         }
     }
 

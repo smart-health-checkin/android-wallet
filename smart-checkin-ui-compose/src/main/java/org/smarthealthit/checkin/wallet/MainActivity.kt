@@ -84,6 +84,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -1184,6 +1187,7 @@ private fun classTextForUi(code: JSONObject?): String? {
 @Composable
 fun DemoApp(
     state: ScreenState,
+    caller: CallerIdentity? = null,
     selectedItems: SnapshotStateMap<String, Boolean>,
     selectedCandidates: SnapshotStateMap<String, Set<String>>,
     questionnaireAnswers: SnapshotStateMap<String, Any>,
@@ -1212,6 +1216,7 @@ fun DemoApp(
             is ScreenState.Complete -> CompleteScreen(padding)
             is ScreenState.Consent -> ConsentScreen(
                 request = state.request,
+                caller = caller,
                 resolutions = state.resolutions,
                 selectedItems = selectedItems,
                 selectedCandidates = selectedCandidates,
@@ -1336,6 +1341,7 @@ private fun CompleteScreen(padding: PaddingValues) {
 @Composable
 private fun ConsentScreen(
     request: VerifiedRequest,
+    caller: CallerIdentity?,
     resolutions: List<RequestItemResolution>,
     selectedItems: SnapshotStateMap<String, Boolean>,
     selectedCandidates: SnapshotStateMap<String, Set<String>>,
@@ -1354,7 +1360,7 @@ private fun ConsentScreen(
             .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        HeaderCard(request)
+        HeaderCard(request, caller)
 
         Text(
             text = "Choose what to share",
@@ -1408,12 +1414,14 @@ private fun ConsentScreen(
             }
         }
 
-        TechnicalSummary(request)
+        TechnicalSummary(request, caller as? CallerIdentity.App)
     }
 }
 
 @Composable
-private fun HeaderCard(request: VerifiedRequest) {
+private fun HeaderCard(request: VerifiedRequest, caller: CallerIdentity?) {
+    val app = caller as? CallerIdentity.App
+    val check = app?.check as? AppLinkStatus.Done
     ElevatedPanel {
         Text(
             text = "A practice is asking for your health information",
@@ -1428,8 +1436,10 @@ private fun HeaderCard(request: VerifiedRequest) {
                 "The verifier signed this request with readerAuth; review the requested data before sharing."
             request.readerAuth.present ->
                 "The verifier sent readerAuth, but its signature did not verify. Review carefully before sharing."
-            else ->
+            app == null || (check != null && check.verifiedSites.isNotEmpty()) ->
                 "Check that you recognize the website below before sharing."
+            else ->
+                "Check who is asking below before sharing."
         }
         Text(
             text = readerAuthText,
@@ -1439,7 +1449,96 @@ private fun HeaderCard(request: VerifiedRequest) {
 
         Spacer(Modifier.height(16.dp))
 
-        VerifierStrip(request.verifierOrigin, request.readerAuth)
+        if (app == null) {
+            VerifierStrip(request.verifierOrigin, request.readerAuth)
+        } else {
+            AppCallerStrip(app, request.readerAuth)
+        }
+    }
+}
+
+/** "a", "a and b", "a, b, and c". */
+private fun joinSites(sites: List<String>): String = when (sites.size) {
+    0 -> ""
+    1 -> sites[0]
+    2 -> "${sites[0]} and ${sites[1]}"
+    else -> sites.dropLast(1).joinToString(", ") + ", and " + sites.last()
+}
+
+/**
+ * An app caller, named only by the websites that vouch for it (the two-way
+ * Digital Asset Links check). Its package name and label are its own choice, so
+ * they appear only under Technical details.
+ */
+@Composable
+private fun AppCallerStrip(app: CallerIdentity.App, readerAuth: ReaderAuthVerification) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SmartRadius.lg))
+            .background(AppColors.PanelAlt)
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
+            .padding(12.dp),
+    ) {
+        Text(
+            text = "Verifier",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = AppColors.Muted,
+        )
+        Spacer(Modifier.height(4.dp))
+        when (val check = app.check) {
+            is AppLinkStatus.Checking -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = AppColors.Primary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Checking…",
+                    modifier = Modifier.testTag("caller-headline"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.Muted,
+                )
+            }
+            is AppLinkStatus.Done -> {
+                val verified = check.verifiedSites.map { it.removePrefix("https://") }
+                val headline = buildAnnotatedString {
+                    when {
+                        verified.isNotEmpty() -> {
+                            append("An app linked to ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(joinSites(verified)) }
+                            append(" is asking")
+                        }
+                        check.declaredSites.isEmpty() -> append("An app that isn't linked to any website is asking")
+                        else -> append("An app linked to no verified website is asking")
+                    }
+                }
+                Text(
+                    text = headline,
+                    modifier = Modifier.testTag("caller-headline"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.Ink,
+                )
+                if (verified.isEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Share only if you opened this from an app you trust.",
+                        modifier = Modifier.testTag("caller-caution"),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.Amber,
+                    )
+                }
+            }
+        }
+        if (readerAuth.present && readerAuth.certificateSubject != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Reader certificate: ${readerAuth.certificateSubject}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (readerAuth.signatureValid) AppColors.Success else AppColors.Amber,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -2584,7 +2683,7 @@ private fun ConsentActions(onShare: () -> Unit, onDecline: () -> Unit) {
 }
 
 @Composable
-private fun TechnicalSummary(request: VerifiedRequest) {
+private fun TechnicalSummary(request: VerifiedRequest, app: CallerIdentity.App?) {
     var expanded by remember { mutableStateOf(false) }
     ElevatedPanel {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2601,11 +2700,37 @@ private fun TechnicalSummary(request: VerifiedRequest) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Optional raw request details for debugging and test captures.",
+            text = if (app == null) {
+                "Optional raw request details for debugging and test captures."
+            } else {
+                "What the calling app says about itself, the website check, and the raw request."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = AppColors.Muted,
         )
         if (expanded) {
+            if (app != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Calling app",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.Muted,
+                )
+                Spacer(Modifier.height(6.dp))
+                DebugLine("package", app.packageName)
+                DebugLine("app's own name", (app.appLabel ?: "unknown") + " (chosen by the app, not verified)")
+                DebugLine("installed by", app.installer ?: "unknown")
+                DebugLine("origin", app.protocolOrigin)
+                when (val check = app.check) {
+                    is AppLinkStatus.Checking -> DebugLine("websites", "checking…")
+                    is AppLinkStatus.Done -> {
+                        DebugLine("declared sites", check.declaredSites.ifEmpty { listOf("none") }.joinToString(", "))
+                        check.results.forEach { DebugLine("website check", it) }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "Request transport",
