@@ -30,7 +30,7 @@ const SEQUENCES: Record<string, string[]> = { repeat: ["small", "small"], mixed:
 const PKG = "org.smarthealthit.checkin.verifier";
 const APP_HEADLINE = "An app is asking for your health information";
 const REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json";
-const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/baseline-4.json";
+const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/uscdi.json";
 const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/platform-tools/adb`;
 const adb = (...a: string[]) => $`${ADB} -s ${SERIAL} ${a}`.quiet().nothrow();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

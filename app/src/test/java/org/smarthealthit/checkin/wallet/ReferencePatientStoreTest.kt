@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The reference patient answering the connectathon baseline requests, the way
+ * The reference patient answering the connectathon's scenario requests, the way
  * the web SMART Testing Wallet does. Requests are copies of
  * the request files in smart-health-checkin/connectathon.
  */
@@ -33,8 +33,8 @@ class ReferencePatientStoreTest {
     }
 
     @Test
-    fun baseline1MatchesEachItemByProfile() {
-        val items = items("baseline-1")
+    fun recordsRequestMatchesEachItemByProfile() {
+        val items = items("records")
         val resolutions = store.resolveItems(items)
         val expected = mapOf(
             "patient" to "Patient",
@@ -53,7 +53,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun medicationsBundleIncludesThePrescriberSoReferencesResolve() {
-        val items = items("baseline-1")
+        val items = items("records")
         val meds = items.first { it.id == "medications" }
         val bundle = bundleFor(meds, store.resolveItems(listOf(meds)).single())
         assertEquals(listOf("MedicationRequest", "MedicationRequest", "MedicationRequest", "Practitioner"), types(bundle))
@@ -63,7 +63,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun coverageMatchesCarinOrUsCoreAndBringsThePayer() {
-        val coverage = items("baseline-2").first { it.id == "coverage" }
+        val coverage = items("insurance").first { it.id == "coverage" }
         val resolution = store.resolveItems(listOf(coverage)).single()
         assertEquals(listOf("Coverage"), resolution.candidates.map { it.resourceType })
         assertEquals(listOf("Coverage", "Organization"), types(bundleFor(coverage, resolution)))
@@ -79,7 +79,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun questionnaireResponseEchoesTheRequestedCanonicalExactly() {
-        val phq2 = items("baseline-3").first { it.id == "phq2" }
+        val phq2 = items("form-phq2").first { it.id == "phq2" }
         val qr = QuestionnaireResponseBuilder.build(phq2, emptyMap())
         assertEquals("https://smart-health-checkin.org/connectathon/Questionnaire/phq-2.json", qr.getString("questionnaire"))
 
