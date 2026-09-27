@@ -264,7 +264,7 @@ for offline inspection.
 The two test patients, the same as the connectathon's SMART Testing Wallet,
 are in `app/src/main/assets/reference-patients/`: `aria-test.json` and
 `large-record.json` (a large record, for the connectathon's
-[larger data scenarios](https://smart-health-checkin.org/connectathon/scenarios.html#larger-data-scenarios)).
+[larger data scenarios](https://smart-health-checkin.org/connectathon/advanced.html#larger-data-scenarios)).
 
 More demo data is bundled under `app/src/main/assets/demo-data/`:
 
