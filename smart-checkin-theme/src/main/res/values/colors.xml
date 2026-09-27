@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Window colors before Compose draws, and the logo's purple petal.
+     The values match SmartColors (SmartTheme.kt); values-night has the dark ones. -->
+<resources>
+    <color name="smart_page">#FFF6F8FA</color>
+    <color name="smart_brand">#FF0E6FB8</color>
+    <color name="smart_logo_purple">#FF722772</color>
+</resources>

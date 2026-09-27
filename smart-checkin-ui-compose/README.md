@@ -13,7 +13,14 @@ holder-data lookup live in the other modules.
 - `DemoApp`: the holder review screen that `HandlerActivity` shows for each
   request. It lists the requested items and the matching records, renders
   Questionnaire items as input controls, and ends with Share or Decline.
-- `SampleHealthTheme`: the colors and type used by both screens.
+- `WalletTheme`: `SmartTheme` from [`smart-checkin-theme`](../smart-checkin-theme/README.md)
+  (the site's colors in light and dark, following the system setting, and
+  Inter), with Compose test tags exposed as resource ids for UI automation.
+
+The controls that automation drives have test tags: `share-selected` and
+`decline` on the review screen, `question` on each form question's label,
+`patient-aria` and `patient-large` on the home screen. Tests match these
+instead of the wording.
 
 ## Registration on the home screen
 
@@ -61,5 +68,5 @@ as separate facts on the screen.
 ## Dependencies
 
 The module depends on `smart-checkin-core`, `smart-checkin-mdoc`,
-`smart-checkin-credential-manager`, and the Compose, Material 3, and
-lifecycle libraries.
+`smart-checkin-credential-manager`, `smart-checkin-theme`, and the Compose,
+Material 3, and lifecycle libraries.

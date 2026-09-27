@@ -30,6 +30,7 @@ dependencies {
     implementation project(":smart-checkin-core")
     implementation project(":smart-checkin-mdoc")
     implementation project(":smart-checkin-credential-manager")
+    api project(":smart-checkin-theme")
 
     implementation platform("androidx.compose:compose-bom:2024.12.01")
     implementation "androidx.activity:activity-compose:1.10.0"

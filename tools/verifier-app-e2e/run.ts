@@ -33,13 +33,23 @@ const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/pl
 const adb = (...a: string[]) => $`${ADB} -s ${SERIAL} ${a}`.quiet().nothrow();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function tapByDescription(desc: string) {
+type Node = { text: string; id: string; desc: string; x: number; y: number };
+/** The nodes on screen. Compose test tags show as resource ids (`id`); older builds used content descriptions. */
+async function screen(): Promise<Node[]> {
   await adb("shell", "uiautomator", "dump", "/sdcard/ui.xml");
   const xml = (await adb("shell", "cat", "/sdcard/ui.xml")).stdout.toString();
-  const m = xml.match(new RegExp(`content-desc="${desc}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`));
-  if (!m) throw new Error(`no "${desc}" button on screen`);
-  const [x, y] = [(+m[1]! + +m[3]!) >> 1, (+m[2]! + +m[4]!) >> 1];
-  await adb("shell", "input", "tap", String(x), String(y));
+  return [...xml.matchAll(/<node ([^>]*)>/g)].map((m) => {
+    const a = Object.fromEntries([...m[1]!.matchAll(/([\w-]+)="([^"]*)"/g)].map((x) => [x[1], x[2]]));
+    const [l, t, r, b] = (a.bounds ?? "[0,0][0,0]").match(/\d+/g)!.map(Number);
+    return { text: a.text ?? "", id: (a["resource-id"] ?? "").replace(/^.*:id\//, ""), desc: a["content-desc"] ?? "", x: (l! + r!) >> 1, y: (t! + b!) >> 1 };
+  });
+}
+
+/** Tap the control with this test tag (or, in builds before 0.4.5, this content description). */
+async function tapById(id: string) {
+  const n = (await screen()).find((n) => n.id === id || n.desc === id);
+  if (!n) throw new Error(`no "${id}" button on screen`);
+  await adb("shell", "input", "tap", String(n.x), String(n.y));
 }
 
 /** Ids of Chrome's open tabs (none if Chrome isn't running yet). */
@@ -67,16 +77,12 @@ async function waitFor<T>(what: string, ms: number, fn: () => Promise<T | undefi
   throw new Error(`timed out waiting for ${what}`);
 }
 
-/** Tap the first on-screen node whose text matches; returns whether it tapped. */
-async function tapText(re: RegExp): Promise<boolean> {
-  await adb("shell", "uiautomator", "dump", "/sdcard/ui.xml");
-  const xml = (await adb("shell", "cat", "/sdcard/ui.xml")).stdout.toString();
-  for (const m of xml.matchAll(/text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g)) {
-    if (!re.test(m[1]!)) continue;
-    await adb("shell", "input", "tap", String((+m[2]! + +m[4]!) >> 1), String((+m[3]! + +m[5]!) >> 1));
-    return true;
-  }
-  return false;
+/** Tap the first on-screen node with this resource id or whose text matches; returns whether it tapped. */
+async function tapIfShown(id: string | null, re: RegExp): Promise<boolean> {
+  const n = (await screen()).find((n) => (id && n.id === id) || re.test(n.text));
+  if (!n) return false;
+  await adb("shell", "input", "tap", String(n.x), String(n.y));
+  return true;
 }
 
 /** Start the app in a fresh process, or (fresh=false) keep the running one, which is in front after its last result. */
@@ -92,7 +98,7 @@ async function launch(fresh: boolean, extras = "") {
 async function runDirect(fresh = true): Promise<boolean> {
   await launch(fresh);
   const t0 = Date.now();
-  await tapByDescription("direct-checkin");
+  await tapById("direct-checkin");
   // The platform's sheet, then the wallet's consent screen.
   for (const end = Date.now() + 120000; Date.now() < end; await sleep(1500)) {
     const log = (await adb("logcat", "-d", "-s", "SHCVerifier:I")).stdout.toString();
@@ -102,8 +108,9 @@ async function runDirect(fresh = true): Promise<boolean> {
       console.log(`${ok ? "ok  " : "FAIL"} direct: ${((Date.now() - t0) / 1000).toFixed(1)} s total; app: ${result}`);
       return ok;
     }
-    // Share first: the wallet's screen also shows the text "SMART Health Check-in".
-    if (!(await tapText(/^Share selected data$/))) await tapText(/^(Agree and continue|Continue)$/);
+    // The wallet's share button first (its test tag, or its label in wallets before 0.4.5),
+    // then the system sheet's buttons.
+    if (!(await tapIfShown("share-selected", /^Share selected data$/))) await tapIfShown(null, /^(Agree and continue|Continue)$/);
   }
   console.log("FAIL direct: no result within 120 s");
   return false;
@@ -129,7 +136,7 @@ async function runStep(name: string, fresh: boolean): Promise<boolean> {
   // Tabs already open (an earlier step's wallet tab stays open in Chrome) aren't this step's.
   const earlier = await tabIds();
   const t0 = Date.now();
-  await tapByDescription("browser-checkin");
+  await tapById("browser-checkin");
 
   const browser: Browser = await waitFor("Chrome DevTools", 30000, async () => {
     await adb("forward", `tcp:${PORT}`, "localabstract:chrome_devtools_remote");

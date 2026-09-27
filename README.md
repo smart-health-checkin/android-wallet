@@ -25,6 +25,7 @@ Credential Manager registration, and reusable Compose screens.
 | `smart-checkin-mdoc` | Direct `org-iso-mdoc` request parsing, SessionTranscript, readerAuth verification, CBOR, COSE, HPKE-sealed wallet response. | [`smart-checkin-mdoc/README.md`](smart-checkin-mdoc/README.md) |
 | `smart-checkin-credential-manager` | Android Credential Manager / registry-provider registration for the wallet entry and matcher bytes. | [`smart-checkin-credential-manager/README.md`](smart-checkin-credential-manager/README.md) |
 | `smart-checkin-ui-compose` | Compose screens: the home screen (registration, test patient, record import) and the holder review screen with Questionnaire input. | [`smart-checkin-ui-compose/README.md`](smart-checkin-ui-compose/README.md) |
+| `smart-checkin-theme` | The look of smart-health-checkin.org for both apps: a Material 3 theme with its light and dark colors, Inter, the SMART logo, and the top bar, cards, buttons, and status pills. | [`smart-checkin-theme/README.md`](smart-checkin-theme/README.md) |
 | `app` | Demo app shell: manifest, `HandlerActivity`, sample wallet store, bundled demo assets, matcher build/copy tasks, end-to-end wiring. | This file |
 | `verifier-app` | Example: a native app as the Verifier, through the browser (Custom Tab and message channel, reaching web wallets too) or directly through Credential Manager. | [`verifier-app/README.md`](verifier-app/README.md) |
 
@@ -38,8 +39,12 @@ smart-checkin-core
 smart-checkin-credential-manager
   <- smart-checkin-ui-compose
 
+smart-checkin-theme
+  <- smart-checkin-ui-compose
+  <- verifier-app
+
 app
-  -> all four library modules
+  -> all five library modules
 ```
 
 Every module uses the package name `org.smarthealthit.checkin.wallet`; Android
@@ -115,7 +120,7 @@ doctype:   org.smarthealthit.checkin.1
 
 - AGP 8.7.3, Kotlin 2.0.21, Java 17.
 - minSdk 26, target/compileSdk 35.
-- Compose BOM 2024.12.01 for the UI module.
+- Compose BOM 2024.12.01 and Material 3 for the UI and theme modules and `verifier-app`.
 - `androidx.credentials` 1.7.0-alpha03 and `androidx.credentials.registry`
   1.0.0-alpha05, with a pinned androidx.dev snapshot repository in
   `settings.gradle`.
@@ -161,6 +166,12 @@ android-wallet/
     README.md
     src/main/java/org/smarthealthit/checkin/wallet/
       MainActivity.kt
+  smart-checkin-theme/
+    README.md
+    src/main/java/org/smarthealthit/checkin/theme/
+      SmartTheme.kt
+      Components.kt
+    src/main/res/font/inter.ttf
 ```
 
 ## Run the demo app

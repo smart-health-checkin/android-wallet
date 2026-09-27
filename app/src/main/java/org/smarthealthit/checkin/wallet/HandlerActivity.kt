@@ -2,13 +2,11 @@ package org.smarthealthit.checkin.wallet
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import org.smarthealthit.checkin.theme.enableSmartEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,13 +87,10 @@ class HandlerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
-        )
+        enableSmartEdgeToEdge()
 
         setContent {
-            SampleHealthTheme {
+            WalletTheme {
                 DemoApp(
                     state = screenState,
                     selectedItems = selectedItems,

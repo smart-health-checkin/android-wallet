@@ -2,17 +2,17 @@ package org.smarthealthit.checkin.verifier
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Typeface
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Base64
 import android.util.Log
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.credentials.CredentialManager
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -22,6 +22,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import org.smarthealthit.checkin.theme.SmartTheme
+import org.smarthealthit.checkin.theme.enableSmartEdgeToEdge
 import org.smarthealthit.checkin.wallet.DirectMdocRequestParser
 import org.smarthealthit.checkin.wallet.MdocCbor
 import org.smarthealthit.checkin.wallet.SmartMdocBase64
@@ -50,35 +52,28 @@ class VerifierActivity : ComponentActivity() {
         const val DEFAULT_REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json"
     }
 
-    private lateinit var output: TextView
+    /** The last check-in's outcome, shown in the result card; null before the first. */
+    private var outcome by mutableStateOf<Outcome?>(null)
     private lateinit var browserCheckin: BrowserCheckin
     private var startedAt = 0L
+    /** The request the last check-in sent, for the items' titles. */
+    private var sentRequest: JSONObject? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableSmartEdgeToEdge()
         browserCheckin = BrowserCheckin(this, BRIDGE_URL, ::onBrowserResult).also { it.bind() }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 160, 32, 32)
+        setContent {
+            SmartTheme {
+                VerifierScreen(outcome = outcome, onBrowser = ::checkInThroughBrowser, onDirect = ::checkInDirect)
+            }
         }
-        root.addView(Button(this).apply {
-            text = "Check in through the browser"
-            contentDescription = "browser-checkin"
-            setOnClickListener { checkInThroughBrowser() }
-        })
-        root.addView(Button(this).apply {
-            text = "Check in with a wallet on this phone"
-            contentDescription = "direct-checkin"
-            setOnClickListener { checkInDirect() }
-        })
-        output = TextView(this).apply {
-            setTextIsSelectable(true)
-            typeface = Typeface.MONOSPACE
-            textSize = 11f
-        }
-        root.addView(ScrollView(this).apply { addView(output) }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        setContentView(root)
-        show("Ready.")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // The bars' icons follow the new dark setting.
+        enableSmartEdgeToEdge()
     }
 
     override fun onDestroy() {
@@ -89,14 +84,14 @@ class VerifierActivity : ComponentActivity() {
     /** The SMART request to send: the `request` extra, or the bundled example, with a fresh id. */
     private fun smartRequest(): JSONObject {
         val json = intent.getStringExtra("request") ?: assets.open("smart-request.json").bufferedReader().readText()
-        return JSONObject(json).put("id", "verifier-app-${UUID.randomUUID()}")
+        return JSONObject(json).put("id", "verifier-app-${UUID.randomUUID()}").also { sentRequest = it }
     }
 
     // ------------------------------------------------------------ through the browser
 
     private fun checkInThroughBrowser() {
         startedAt = SystemClock.elapsedRealtime()
-        show("Opening the bridge page…")
+        outcome = Outcome.Working("Opening the check-in page in the browser…")
         browserCheckin.start(smartRequest(), intent.getStringExtra("registry") ?: DEFAULT_REGISTRY)
     }
 
@@ -107,16 +102,24 @@ class VerifierActivity : ComponentActivity() {
         when (result) {
             is BrowserCheckin.Result.Completed -> {
                 val response = result.json.getJSONObject("response")
-                show("Received through the browser in $ms ms from ${result.json.optString("wallet")}: " +
-                    "${result.chars} chars in ${result.parts} part(s)\n\n" + summarize(response))
+                outcome = Outcome.Completed(
+                    via = "Received through the browser.",
+                    details = listOf(
+                        "Wallet" to result.json.optString("wallet").ifBlank { "Not named" },
+                        "Time" to "${number(ms)} ms",
+                        "Size" to "${number(result.chars)} characters in ${result.parts} ${if (result.parts == 1) "part" else "parts"}",
+                    ),
+                    response = response,
+                    request = sentRequest,
+                )
                 Log.i(TAG, "RESULT path=browser ok=true ms=$ms chars=${result.chars} parts=${result.parts} wallet=${result.json.optString("wallet")}")
             }
             BrowserCheckin.Result.Declined -> {
-                show("Nothing was shared.")
+                outcome = Outcome.Declined("Nothing was shared: the check-in was declined or closed in the browser.")
                 Log.i(TAG, "RESULT path=browser ok=false declined=true ms=$ms")
             }
             is BrowserCheckin.Result.Failed -> {
-                show("Failed: ${result.message}")
+                outcome = Outcome.Failed(result.message)
                 Log.i(TAG, "RESULT path=browser ok=false ms=$ms message=${result.message}")
             }
         }
@@ -127,27 +130,43 @@ class VerifierActivity : ComponentActivity() {
     private fun checkInDirect() {
         val built = OrgIsoMdocRequestBuilder.build(smartRequest().toString())
         val request = GetCredentialRequest(listOf(GetDigitalCredentialOption(built.requestJson)))
-        show("Asking the phone's wallets…")
+        outcome = Outcome.Working("Asking the wallets on this phone…")
         val t0 = SystemClock.elapsedRealtime()
         lifecycleScope.launch {
             try {
                 val credential = CredentialManager.create(this@VerifierActivity).getCredential(this@VerifierActivity, request).credential
-                if (credential !is DigitalCredential) return@launch show("Unexpected credential type ${credential.type}")
+                if (credential !is DigitalCredential) {
+                    outcome = Outcome.Failed("Credential Manager returned something other than a digital credential.", "Credential type: ${credential.type}")
+                    return@launch
+                }
                 val smartResponse = openDirectResponse(credential.credentialJson, built)
                 val ms = SystemClock.elapsedRealtime() - t0
-                show("Received directly in $ms ms\n\n" + summarize(JSONObject(smartResponse)))
+                outcome = Outcome.Completed(
+                    via = "Received directly from a wallet on this phone.",
+                    details = listOf(
+                        "Time" to "${number(ms)} ms",
+                        "Size" to "${number(smartResponse.length)} characters",
+                    ),
+                    response = JSONObject(smartResponse),
+                    request = sentRequest,
+                )
                 Log.i(TAG, "RESULT path=direct ok=true ms=$ms chars=${smartResponse.length}")
             } catch (e: GetCredentialException) {
-                show("Failed: ${e.type} ${e.message}")
+                outcome = Outcome.Failed(
+                    "Credential Manager ended the check-in without a response. The wallet may have been closed, or no wallet on this phone can answer.",
+                    listOfNotNull(e.type, e.message).joinToString("\n"),
+                )
                 Log.i(TAG, "RESULT path=direct ok=false type=${e.type}")
             } catch (t: Throwable) {
                 // AEADBadTagException (BAD_DECRYPT): the wallet sealed the answer to a different
                 // transcript, usually a wallet older than v0.4.2, from before android:apk-key-hash: origins.
                 val plain = if (generateSequence(t) { it.cause }.any { it is AEADBadTagException || it.message?.contains("BAD_DECRYPT") == true }) {
                     "This wallet's answer couldn't be opened by this app. The wallet may be out of date, " +
-                        "or it sealed the answer for a different origin.\n\n"
-                } else ""
-                show("${plain}Failed: $t")
+                        "or it sealed the answer for a different origin."
+                } else {
+                    "The wallet's answer couldn't be read."
+                }
+                outcome = Outcome.Failed(plain, t.toString())
                 Log.e(TAG, "direct check-in failed", t)
                 Log.i(TAG, "RESULT path=direct ok=false error=$t")
             }
@@ -176,24 +195,5 @@ class VerifierActivity : ComponentActivity() {
             .signingInfo!!.apkContentsSigners[0].toByteArray()
         val digest = MessageDigest.getInstance("SHA-256").digest(cert)
         return "android:apk-key-hash:" + Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-    }
-
-    // ------------------------------------------------------------ display
-
-    private fun summarize(response: JSONObject): String {
-        val statuses = response.getJSONArray("requestStatus")
-        val artifacts = response.getJSONArray("artifacts")
-        return buildString {
-            append("Items:\n")
-            for (i in 0 until statuses.length()) statuses.getJSONObject(i).let { append("  ${it.getString("item")}: ${it.getString("status")}\n") }
-            append("Artifacts: ${artifacts.length()}\n")
-            for (i in 0 until artifacts.length()) artifacts.getJSONObject(i).let {
-                append("  ${it.getString("id")} ${it.getString("mediaType")} → ${it.getJSONArray("fulfills").join(", ")}\n")
-            }
-        }
-    }
-
-    private fun show(text: String) {
-        output.text = text
     }
 }

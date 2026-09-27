@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The logo (91 x 75) centered in the adaptive icon's 66/108 safe zone:
+     60/108 wide (22.2% in from each side), 49.5/108 high (27.1% from top and bottom). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/smart_logo"
+    android:insetLeft="22.2%"
+    android:insetRight="22.2%"
+    android:insetTop="27.1%"
+    android:insetBottom="27.1%" />

@@ -1,14 +1,11 @@
 package org.smarthealthit.checkin.wallet
 
-import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -80,6 +77,28 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import org.smarthealthit.checkin.theme.CodeBlock
+import org.smarthealthit.checkin.theme.SmartCard
+import org.smarthealthit.checkin.theme.SmartHeading
+import org.smarthealthit.checkin.theme.SmartPrimaryButton
+import org.smarthealthit.checkin.theme.SmartRadius
+import org.smarthealthit.checkin.theme.SmartSecondaryButton
+import org.smarthealthit.checkin.theme.SmartTextButton
+import org.smarthealthit.checkin.theme.SmartTheme
+import org.smarthealthit.checkin.theme.SmartTopBar
+import org.smarthealthit.checkin.theme.StatusPill
+import org.smarthealthit.checkin.theme.StatusTone
+import org.smarthealthit.checkin.theme.enableSmartEdgeToEdge
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -118,10 +137,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
-        )
+        enableSmartEdgeToEdge()
         importedRecords = runCatching { ImportedHealthRecordsRepository.load(filesDir) }
             .onFailure { Log.w(TAG, "failed to load imported records", it) }
             .getOrNull()
@@ -130,7 +146,7 @@ class MainActivity : ComponentActivity() {
             .getString(ReferencePatients.PREF_KEY, ReferencePatients.ARIA) ?: ReferencePatients.ARIA
 
         setContent {
-            SampleHealthTheme {
+            WalletTheme {
                 HomeScreen(
                     registration = registration,
                     importedRecords = importedRecords,
@@ -629,36 +645,31 @@ private fun HomeScreen(
     Scaffold(
         containerColor = AppColors.Page,
         contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = { SmartTopBar(title = "SMART Health Check-in Wallet", subtitle = "Reference wallet") },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            BrandMark()
             Text(
-                text = "SMART Health Check-in Wallet",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.Ink,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "The wallet is available for SMART Health Check-in requests over the Digital Credentials API (org-iso-mdoc).",
+                text = "This wallet answers SMART Health Check-in requests that websites and apps send through the Digital Credentials API (org-iso-mdoc).",
                 style = MaterialTheme.typography.bodyLarge,
                 color = AppColors.Muted,
             )
 
             ElevatedPanel {
-                Text(
-                    text = "Wallet status",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.Ink,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SmartHeading("Wallet status", Modifier.weight(1f))
+                    when (registration) {
+                        RegistrationState.Idle, RegistrationState.Pending -> StatusPill("Registering", StatusTone.Info)
+                        is RegistrationState.Registered -> StatusPill("Ready", StatusTone.Ok, Modifier.testTag("wallet-ready"))
+                        is RegistrationState.Failed -> StatusPill("Not registered", StatusTone.Bad)
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 val statusLine = when (registration) {
                     RegistrationState.Idle -> "Preparing Credential Manager registration."
@@ -674,23 +685,56 @@ private fun HomeScreen(
                 )
                 if (registration is RegistrationState.Failed) {
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onRegister) {
+                    SmartSecondaryButton(onClick = onRegister, modifier = Modifier.testTag("retry-registration")) {
                         Text("Retry")
                     }
                 }
             }
 
             ElevatedPanel {
+                SmartHeading("Reference patient")
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Imported records",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.Ink,
+                    text = "The synthetic patient this wallet answers as when no records are imported. The same patients as the SMART Testing Wallet on the web.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.Muted,
                 )
+                if (importedSummary != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Imported records are active, so check-in responses use them instead.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppColors.Subtle,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                ReferencePatients.labels.forEach { (key, label) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape(SmartRadius.md))
+                            .selectable(
+                                selected = referencePatient == key,
+                                onClick = { onReferencePatientChange(key) },
+                                role = Role.RadioButton,
+                            )
+                            .testTag("patient-$key"),
+                    ) {
+                        RadioButton(selected = referencePatient == key, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = AppColors.Ink)
+                    }
+                }
+            }
+
+            ElevatedPanel {
+                SmartHeading("Imported records")
                 Spacer(Modifier.height(8.dp))
                 if (importedSummary == null) {
                     Text(
-                        text = "No imported records. Check-in responses use the reference patient below.",
+                        text = "No imported records. Check-in responses use the reference patient above.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = AppColors.Muted,
                     )
@@ -728,20 +772,20 @@ private fun HomeScreen(
                         Text("Import failed: ${importState.message}", style = MaterialTheme.typography.bodySmall, color = AppColors.Error)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Button(
+                Spacer(Modifier.height(16.dp))
+                SmartPrimaryButton(
                     onClick = onImportRecords,
                     enabled = importState !is ImportState.Pending,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("import-records"),
                 ) {
                     Text(if (importedSummary == null) "Load Health Skillz export" else "Replace imported records")
                 }
                 if (importedSummary != null) {
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
+                    SmartSecondaryButton(
                         onClick = onClearImportedRecords,
                         enabled = importState !is ImportState.Pending,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("clear-imported-records"),
                     ) {
                         Text("Use the reference patient")
                     }
@@ -752,43 +796,9 @@ private fun HomeScreen(
                 ImportedRecordsBrowser(importedRecords)
             }
 
-            ElevatedPanel {
-                Text(
-                    text = "Reference patient",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.Ink,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "The synthetic patient this wallet answers as when no records are imported. The same patients as the SMART Testing Wallet on the web.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.Muted,
-                )
-                Spacer(Modifier.height(8.dp))
-                ReferencePatients.labels.forEach { (key, label) ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = referencePatient == key,
-                                onClick = { onReferencePatientChange(key) },
-                                role = Role.RadioButton,
-                            )
-                            .padding(vertical = 4.dp),
-                    ) {
-                        RadioButton(selected = referencePatient == key, onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = AppColors.Ink)
-                    }
-                }
-            }
-
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+            SmartSecondaryButton(onClick = onClose, modifier = Modifier.fillMaxWidth().testTag("close")) {
                 Text("Close")
             }
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
@@ -843,7 +853,7 @@ private fun ProviderRecordsCard(
     val totalResources = provider.fhir.values.sumOf { it.size }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(SmartRadius.lg),
         colors = CardDefaults.cardColors(containerColor = AppColors.PanelAlt),
         border = BorderStroke(1.dp, AppColors.Line),
     ) {
@@ -874,7 +884,7 @@ private fun ProviderRecordsCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                TextButton(onClick = { onExpandedChange(!expanded) }) {
+                SmartTextButton(onClick = { onExpandedChange(!expanded) }) {
                     Text(if (expanded) "Hide" else "Browse")
                 }
             }
@@ -916,8 +926,8 @@ private fun ProviderResourceTypeCard(
     val visibleResources = if (showAll) resources else resources.take(BROWSER_GROUP_PREVIEW_LIMIT)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(SmartRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         border = BorderStroke(1.dp, AppColors.Line),
     ) {
         Column(Modifier.padding(12.dp)) {
@@ -942,7 +952,7 @@ private fun ProviderResourceTypeCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                TextButton(onClick = { expandedGroups[groupKey] = !expanded }) {
+                SmartTextButton(onClick = { expandedGroups[groupKey] = !expanded }) {
                     Text(if (expanded) "Hide" else "Open")
                 }
             }
@@ -960,7 +970,7 @@ private fun ProviderResourceTypeCard(
                 }
                 if (resources.size > BROWSER_GROUP_PREVIEW_LIMIT) {
                     Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = { showAllGroups[groupKey] = !showAll }) {
+                    SmartTextButton(onClick = { showAllGroups[groupKey] = !showAll }) {
                         Text(if (showAll) "Show fewer" else "Show all ${resources.size}")
                     }
                 }
@@ -979,9 +989,9 @@ private fun BrowserResourceRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(SmartRadius.md))
             .background(AppColors.PanelAlt)
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.md))
             .padding(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1013,23 +1023,14 @@ private fun BrowserResourceRow(
                 }
             }
             if (candidateJson != null) {
-                TextButton(onClick = { onJsonExpandedChange(!jsonExpanded) }) {
+                SmartTextButton(onClick = { onJsonExpandedChange(!jsonExpanded) }) {
                     Text(if (jsonExpanded) "Hide JSON" else "JSON")
                 }
             }
         }
         if (jsonExpanded && candidateJson != null) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = candidateJson.toString(2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .padding(10.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = AppColors.Ink,
-            )
+            CodeBlock(candidateJson.toString(2).replace("\\/", "/"))
         }
     }
 }
@@ -1196,6 +1197,7 @@ fun DemoApp(
     Scaffold(
         containerColor = AppColors.Page,
         contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = { SmartTopBar(title = "SMART Health Check-in Wallet", subtitle = "Reference wallet") },
         bottomBar = {
             if (state is ScreenState.Consent) {
                 ConsentActions(onShare = onShare, onDecline = onDecline)
@@ -1226,8 +1228,6 @@ fun DemoApp(
 @Composable
 private fun EmptyScreen(padding: PaddingValues, onClose: () -> Unit) {
     CenterPanel(padding) {
-        BrandMark()
-        Spacer(Modifier.height(24.dp))
         Text(
             text = "Open from a check-in link",
             style = MaterialTheme.typography.headlineSmall,
@@ -1241,7 +1241,7 @@ private fun EmptyScreen(padding: PaddingValues, onClose: () -> Unit) {
             color = AppColors.Muted,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+        SmartPrimaryButton(onClick = onClose, modifier = Modifier.fillMaxWidth().testTag("close")) {
             Text("Close")
         }
     }
@@ -1251,7 +1251,7 @@ private fun EmptyScreen(padding: PaddingValues, onClose: () -> Unit) {
 private fun LoadingScreen(state: ScreenState.Loading, padding: PaddingValues) {
     CenterPanel(padding) {
         CircularProgressIndicator(color = AppColors.Primary)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = state.title,
             style = MaterialTheme.typography.headlineSmall,
@@ -1271,7 +1271,7 @@ private fun LoadingScreen(state: ScreenState.Loading, padding: PaddingValues) {
 private fun SubmittingScreen(state: ScreenState.Submitting, padding: PaddingValues) {
     CenterPanel(padding) {
         CircularProgressIndicator(color = AppColors.Primary)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = state.title,
             style = MaterialTheme.typography.headlineSmall,
@@ -1291,9 +1291,10 @@ private fun SubmittingScreen(state: ScreenState.Submitting, padding: PaddingValu
 private fun ErrorScreen(state: ScreenState.Error, padding: PaddingValues, onClose: () -> Unit) {
     CenterPanel(padding) {
         StatusDot(AppColors.Error, AppColors.ErrorSoft)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
-            text = "Could not complete request",
+            text = "Could not complete the request",
+            modifier = Modifier.testTag("error-title"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
@@ -1305,7 +1306,7 @@ private fun ErrorScreen(state: ScreenState.Error, padding: PaddingValues, onClos
             color = AppColors.Muted,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+        SmartPrimaryButton(onClick = onClose, modifier = Modifier.fillMaxWidth().testTag("close")) {
             Text("Close")
         }
     }
@@ -1315,16 +1316,17 @@ private fun ErrorScreen(state: ScreenState.Error, padding: PaddingValues, onClos
 private fun CompleteScreen(padding: PaddingValues) {
     CenterPanel(padding) {
         StatusDot(AppColors.Success, AppColors.SuccessSoft)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
-            text = "Submission complete",
+            text = "Data shared",
+            modifier = Modifier.testTag("complete-title"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Your selected sample health data was encrypted and shared with the verifier.",
+            text = "The data you selected was encrypted and sent to the verifier.",
             style = MaterialTheme.typography.bodyLarge,
             color = AppColors.Muted,
         )
@@ -1349,7 +1351,7 @@ private fun ConsentScreen(
             .fillMaxSize()
             .padding(padding)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         HeaderCard(request)
@@ -1407,37 +1409,17 @@ private fun ConsentScreen(
         }
 
         TechnicalSummary(request)
-        Spacer(Modifier.height(96.dp))
     }
 }
 
 @Composable
 private fun HeaderCard(request: VerifiedRequest) {
     ElevatedPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BrandMark()
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = "SMART Health Check-in Wallet",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.Ink,
-                )
-                Text(
-                    text = "Reference wallet with synthetic patients",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.Muted,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(22.dp))
-
         Text(
             text = "A practice is asking for your health information",
+            modifier = Modifier.semantics { heading() },
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
         )
         Spacer(Modifier.height(8.dp))
@@ -1455,7 +1437,7 @@ private fun HeaderCard(request: VerifiedRequest) {
             color = AppColors.Muted,
         )
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(16.dp))
 
         VerifierStrip(request.verifierOrigin, request.readerAuth)
     }
@@ -1466,10 +1448,10 @@ private fun VerifierStrip(verifierOrigin: String, readerAuth: ReaderAuthVerifica
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(SmartRadius.lg))
             .background(AppColors.PanelAlt)
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(16.dp))
-            .padding(14.dp),
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
+            .padding(12.dp),
     ) {
         Text(
             text = "Verifier",
@@ -1535,12 +1517,7 @@ private fun DataRequestCard(
             Switch(
                 checked = selected,
                 onCheckedChange = onSelectedChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = AppColors.Primary,
-                    uncheckedThumbColor = Color.White,
-                    uncheckedTrackColor = AppColors.SwitchOff,
-                ),
+                modifier = Modifier.testTag("item-switch-${item.id}"),
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -1597,10 +1574,10 @@ private fun CandidateSelectionCard(
                     color = AppColors.Muted,
                 )
             }
-            TextButton(onClick = { setCandidates(resolution.candidates, true) }) {
+            SmartTextButton(onClick = { setCandidates(resolution.candidates, true) }) {
                 Text("All")
             }
-            TextButton(onClick = { setCandidates(resolution.candidates, false) }) {
+            SmartTextButton(onClick = { setCandidates(resolution.candidates, false) }) {
                 Text("None")
             }
         }
@@ -1656,7 +1633,7 @@ private fun ResourceTypeGroupCard(
     val visibleCandidates = if (showAll) group.candidates else group.candidates.take(CANDIDATE_GROUP_PREVIEW_LIMIT)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(SmartRadius.lg),
         colors = CardDefaults.cardColors(containerColor = AppColors.PanelAlt),
         border = BorderStroke(1.dp, AppColors.Line),
     ) {
@@ -1665,8 +1642,7 @@ private fun ResourceTypeGroupCard(
                 Checkbox(
                     checked = selectedCount == group.candidates.size,
                     onCheckedChange = { checked -> onCandidatesSelected(group.candidates, checked) },
-                    colors = CheckboxDefaults.colors(checkedColor = AppColors.Primary),
-                )
+                                    )
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = group.label,
@@ -1689,14 +1665,14 @@ private fun ResourceTypeGroupCard(
                         )
                     }
                 }
-                TextButton(onClick = { onCandidatesSelected(group.candidates, true) }) {
+                SmartTextButton(onClick = { onCandidatesSelected(group.candidates, true) }) {
                     Text("All")
                 }
-                TextButton(onClick = { onCandidatesSelected(group.candidates, false) }) {
+                SmartTextButton(onClick = { onCandidatesSelected(group.candidates, false) }) {
                     Text("None")
                 }
             }
-            TextButton(onClick = { onExpandedChange(!expanded) }) {
+            SmartTextButton(onClick = { onExpandedChange(!expanded) }) {
                 Text(if (expanded) "Hide records" else "Review records")
             }
             if (expanded) {
@@ -1711,7 +1687,7 @@ private fun ResourceTypeGroupCard(
                     Spacer(Modifier.height(8.dp))
                 }
                 if (group.candidates.size > CANDIDATE_GROUP_PREVIEW_LIMIT) {
-                    TextButton(onClick = { onShowAllChange(!showAll) }) {
+                    SmartTextButton(onClick = { onShowAllChange(!showAll) }) {
                         Text(if (showAll) "Show fewer" else "Show all ${group.candidates.size}")
                     }
                 }
@@ -1729,12 +1705,12 @@ private fun ResourceCandidateRow(
     onJsonExpandedChange: (Boolean) -> Unit,
 ) {
     val candidateJson = candidate.value
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(SmartRadius.lg)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Color.White)
+            .background(if (selected) SmartTheme.colors.brandWash.copy(alpha = 0.35f) else AppColors.Surface)
             .border(BorderStroke(1.dp, if (selected) AppColors.Primary else AppColors.Line), shape)
             .clickable { onSelectedChange(!selected) }
             .padding(10.dp),
@@ -1743,8 +1719,7 @@ private fun ResourceCandidateRow(
             Checkbox(
                 checked = selected,
                 onCheckedChange = onSelectedChange,
-                colors = CheckboxDefaults.colors(checkedColor = AppColors.Primary),
-            )
+                            )
             Column(Modifier.weight(1f)) {
                 Text(
                     text = candidate.label,
@@ -1773,23 +1748,14 @@ private fun ResourceCandidateRow(
                 }
             }
             if (candidateJson != null) {
-                TextButton(onClick = { onJsonExpandedChange(!jsonExpanded) }) {
+                SmartTextButton(onClick = { onJsonExpandedChange(!jsonExpanded) }) {
                     Text(if (jsonExpanded) "Hide JSON" else "JSON")
                 }
             }
         }
         if (jsonExpanded && candidateJson != null) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = candidateJson.toString(2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppColors.PanelAlt)
-                    .padding(10.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = AppColors.Ink,
-            )
+            CodeBlock(candidateJson.toString(2).replace("\\/", "/"))
         }
     }
 }
@@ -2268,6 +2234,7 @@ private fun QuestionnaireField(
     ) {
         Text(
             text = label,
+            modifier = Modifier.testTag("question"),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
@@ -2294,7 +2261,7 @@ private fun DisplayText(text: String, depth: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = (depth * 8).dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(SmartRadius.md))
             .background(AppColors.PanelAlt)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         style = MaterialTheme.typography.bodyMedium,
@@ -2357,8 +2324,8 @@ private fun IntegerSliderAnswer(item: JSONObject, value: Any?, onChange: (Int) -
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(SmartRadius.lg))
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -2412,8 +2379,8 @@ private fun DateAnswer(value: Any?, onChange: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(SmartRadius.lg))
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2429,7 +2396,7 @@ private fun DateAnswer(value: Any?, onChange: (String) -> Unit) {
             singleLine = true,
             placeholder = { Text("YYYY") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(SmartRadius.md),
         )
         OutlinedTextField(
             value = month,
@@ -2443,7 +2410,7 @@ private fun DateAnswer(value: Any?, onChange: (String) -> Unit) {
             placeholder = { Text("MM") },
             enabled = year.length == 4,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(SmartRadius.md),
         )
         OutlinedTextField(
             value = day,
@@ -2457,7 +2424,7 @@ private fun DateAnswer(value: Any?, onChange: (String) -> Unit) {
             placeholder = { Text("DD") },
             enabled = year.length == 4 && month.length in 1..2,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(SmartRadius.md),
         )
     }
 }
@@ -2485,8 +2452,8 @@ private fun SingleChoiceAnswer(item: JSONObject, value: Any?, onChange: (String)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(SmartRadius.lg))
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
             .padding(vertical = 4.dp),
     ) {
         jsonObjects(item.optJSONArray("answerOption")).forEach { option ->
@@ -2494,13 +2461,16 @@ private fun SingleChoiceAnswer(item: JSONObject, value: Any?, onChange: (String)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // The radio button is the control (48dp target), as UI automation expects.
                 RadioButton(
                     selected = value?.toString() == key,
                     onClick = { onChange(key) },
                 )
+                Spacer(Modifier.width(4.dp))
                 Text(
                     text = answerOptionLabelForUi(option),
                     style = MaterialTheme.typography.bodyMedium,
@@ -2524,8 +2494,8 @@ private fun MultiChoiceAnswer(item: JSONObject, value: Any?, onChange: (List<Str
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(SmartRadius.lg))
+            .border(BorderStroke(1.dp, AppColors.Line), RoundedCornerShape(SmartRadius.lg))
             .padding(vertical = 4.dp),
     ) {
         jsonObjects(item.optJSONArray("answerOption")).forEach { option ->
@@ -2533,7 +2503,8 @@ private fun MultiChoiceAnswer(item: JSONObject, value: Any?, onChange: (List<Str
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
@@ -2542,8 +2513,8 @@ private fun MultiChoiceAnswer(item: JSONObject, value: Any?, onChange: (List<Str
                         val next = if (checked) selected + key else selected - key
                         onChange(next.toList())
                     },
-                    colors = CheckboxDefaults.colors(checkedColor = AppColors.Primary),
                 )
+                Spacer(Modifier.width(4.dp))
                 Text(
                     text = answerOptionLabelForUi(option),
                     style = MaterialTheme.typography.bodyMedium,
@@ -2576,38 +2547,37 @@ private fun TextAnswer(item: JSONObject, value: Any?, onChange: (String) -> Unit
             if (type == "date") Text("YYYY-MM-DD")
         },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(SmartRadius.lg),
     )
 }
 
 @Composable
 private fun ConsentActions(onShare: () -> Unit, onDecline: () -> Unit) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 12.dp,
-        tonalElevation = 4.dp,
-    ) {
+    Surface(color = AppColors.Surface) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
         ) {
-            Button(
-                onClick = onShare,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+            Box(Modifier.fillMaxWidth().height(1.dp).background(AppColors.Line))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Share selected data")
-            }
-            OutlinedButton(
-                onClick = onDecline,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, AppColors.LineStrong),
-            ) {
-                Text("Decline")
+                SmartPrimaryButton(
+                    onClick = onShare,
+                    modifier = Modifier.fillMaxWidth().testTag("share-selected"),
+                ) {
+                    Text("Share selected data")
+                }
+                SmartSecondaryButton(
+                    onClick = onDecline,
+                    modifier = Modifier.fillMaxWidth().testTag("decline"),
+                ) {
+                    Text("Decline")
+                }
             }
         }
     }
@@ -2625,7 +2595,7 @@ private fun TechnicalSummary(request: VerifiedRequest) {
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.Ink,
             )
-            TextButton(onClick = { expanded = !expanded }) {
+            SmartTextButton(onClick = { expanded = !expanded }) {
                 Text(if (expanded) "Hide" else "Show")
             }
         }
@@ -2657,16 +2627,7 @@ private fun TechnicalSummary(request: VerifiedRequest) {
                 color = AppColors.Muted,
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = request.rawSmartRequestJson.ifBlank { "{}" },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AppColors.PanelAlt)
-                    .padding(12.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = AppColors.Ink,
-            )
+            CodeBlock(request.rawSmartRequestJson.ifBlank { "{}" })
         }
     }
 }
@@ -2702,18 +2663,7 @@ private fun NoticeCard(text: String) {
 
 @Composable
 private fun ElevatedPanel(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, AppColors.Line),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            content = content,
-        )
-    }
+    SmartCard(content = content)
 }
 
 @Composable
@@ -2722,40 +2672,10 @@ private fun CenterPanel(padding: PaddingValues, content: @Composable ColumnScope
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .padding(24.dp),
+            .padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, AppColors.Line),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.Start,
-                content = content,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BrandMark() {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.Primary),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "SH",
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        SmartCard(contentPadding = PaddingValues(24.dp), content = content)
     }
 }
 
@@ -2763,14 +2683,14 @@ private fun BrandMark() {
 private fun StatusDot(color: Color, background: Color) {
     Box(
         modifier = Modifier
-            .size(54.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(background),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(18.dp)
+                .size(16.dp)
                 .clip(CircleShape)
                 .background(color),
         )
@@ -2779,24 +2699,14 @@ private fun StatusDot(color: Color, background: Color) {
 
 @Composable
 private fun StatusChip(text: String, tone: ChipTone) {
-    val colors = when (tone) {
-        ChipTone.Success -> AppColors.SuccessSoft to AppColors.Success
-        ChipTone.Warning -> AppColors.AmberSoft to AppColors.Amber
-        ChipTone.Neutral -> AppColors.PanelAlt to AppColors.Muted
-    }
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = colors.first,
-        border = BorderStroke(1.dp, AppColors.Line),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.second,
-        )
-    }
+    StatusPill(
+        text = text,
+        tone = when (tone) {
+            ChipTone.Success -> StatusTone.Ok
+            ChipTone.Warning -> StatusTone.Warn
+            ChipTone.Neutral -> StatusTone.Neutral
+        },
+    )
 }
 
 @Composable
@@ -2808,25 +2718,19 @@ private fun DataGlyph(kind: RequestKind) {
         RequestKind.Questionnaire -> "QA"
         RequestKind.Unknown -> "DT"
     }
-    val background = when (kind) {
-        RequestKind.Coverage -> AppColors.BlueSoft
-        RequestKind.Plan -> AppColors.TealSoft
-        RequestKind.Clinical -> AppColors.VioletSoft
-        RequestKind.Questionnaire -> AppColors.AmberSoft
-        RequestKind.Unknown -> AppColors.PanelAlt
-    }
-    val foreground = when (kind) {
-        RequestKind.Coverage -> AppColors.Primary
-        RequestKind.Plan -> AppColors.Teal
-        RequestKind.Clinical -> AppColors.Violet
-        RequestKind.Questionnaire -> AppColors.Amber
-        RequestKind.Unknown -> AppColors.Muted
+    val c = SmartTheme.colors
+    val (foreground, background) = when (kind) {
+        RequestKind.Coverage -> c.brandInk to c.brandWash
+        RequestKind.Plan -> c.ok to c.okWash
+        RequestKind.Clinical -> c.fg1 to c.surfaceAlt
+        RequestKind.Questionnaire -> c.warn to c.warnWash
+        RequestKind.Unknown -> c.fg3 to c.surfaceAlt
     }
 
     Box(
         modifier = Modifier
             .size(44.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(SmartRadius.md))
             .background(background),
         contentAlignment = Alignment.Center,
     ) {
@@ -2839,20 +2743,20 @@ private fun DataGlyph(kind: RequestKind) {
     }
 }
 
+/**
+ * The wallet's theme: [SmartTheme] (the site's colors, Inter, and shapes,
+ * following the system's dark setting), with test tags exposed as resource
+ * ids so UI automation can find controls without matching their wording.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SampleHealthTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = AppColors.Primary,
-            secondary = AppColors.Teal,
-            background = AppColors.Page,
-            surface = Color.White,
-            error = AppColors.Error,
-        ),
-        content = content,
-    )
+fun WalletTheme(content: @Composable () -> Unit) {
+    SmartTheme {
+        Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+            content()
+        }
+    }
 }
-
 private fun questionnaireValuesFromAnswerState(credentialId: String, answers: Map<String, Any>): JSONObject {
     val values = JSONObject()
     val prefix = "$credentialId::"
@@ -2965,25 +2869,21 @@ private enum class ChipTone {
     Neutral,
 }
 
+/** The screens' color names, mapped to the site's tokens ([SmartTheme.colors]) for the current mode. */
 private object AppColors {
-    val Page = Color(0xFFF6F8FB)
-    val PanelAlt = Color(0xFFF1F5F9)
-    val Line = Color(0xFFE2E8F0)
-    val LineStrong = Color(0xFFCBD5E1)
-    val Ink = Color(0xFF102033)
-    val Muted = Color(0xFF526173)
-    val Subtle = Color(0xFF7A8898)
-    val Primary = Color(0xFF1D5FD1)
-    val BlueSoft = Color(0xFFE8F0FF)
-    val Teal = Color(0xFF0F766E)
-    val TealSoft = Color(0xFFE2F7F4)
-    val Violet = Color(0xFF6D4AFF)
-    val VioletSoft = Color(0xFFF0EDFF)
-    val Amber = Color(0xFF9A5B00)
-    val AmberSoft = Color(0xFFFFF3D6)
-    val Success = Color(0xFF087443)
-    val SuccessSoft = Color(0xFFE5F6EC)
-    val Error = Color(0xFFB42318)
-    val ErrorSoft = Color(0xFFFFE7E5)
-    val SwitchOff = Color(0xFF94A3B8)
+    val Page: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.bgAlt
+    val Surface: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.surface
+    val PanelAlt: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.surfaceAlt
+    val Line: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.border
+    val LineStrong: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.borderStrong
+    val Ink: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.fg1
+    val Muted: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.fg2
+    val Subtle: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.fg3
+    val Primary: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.brand
+    val Amber: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.warn
+    val Success: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.ok
+    val SuccessSoft: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.okWash
+    val Error: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.bad
+    val ErrorSoft: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.badWash
+    val Code: Color @Composable @ReadOnlyComposable get() = SmartTheme.colors.codeBg
 }

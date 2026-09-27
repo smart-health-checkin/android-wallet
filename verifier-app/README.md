@@ -8,6 +8,13 @@ guide is [Native Verifier apps](https://smart-health-checkin.org/client/docs/nat
 | Check in through the browser | Opens the [bridge page](https://smart-health-checkin.org/client/demo/native-bridge.html) in a Custom Tab, sends it the request over a Custom Tabs message channel, and gets the checked response back the same way, in parts ([`BrowserCheckin`](src/main/java/org/smarthealthit/checkin/verifier/BrowserCheckin.kt)). | The phone's wallets and web wallets |
 | Check in with a wallet on this phone | Calls `CredentialManager.getCredential(GetDigitalCredentialOption(…))` directly and decrypts the response here, with the transcript bound to this app's `android:apk-key-hash:` origin. | The phone's wallets |
 
+Below the buttons, the result shows whether the check-in completed, was
+declined, or failed. For a response it lists each requested item with its
+status and how many records came back, and the response JSON can be opened
+below. For a failure it shows what went wrong, with the technical detail
+underneath. The screen uses [`smart-checkin-theme`](../smart-checkin-theme/README.md)
+and follows the phone's dark setting.
+
 Install the latest release on a phone or emulator:
 <https://github.com/smart-health-checkin/android-wallet/releases/latest/download/smart-health-checkin-verifier.apk>
 (`adb install -r smart-health-checkin-verifier.apk` after downloading it). It is
@@ -25,7 +32,8 @@ adb install -r verifier-app/build/outputs/apk/debug/verifier-app-debug.apk
 
 Launch extras, used by the automated test: `request` (a SMART request as JSON)
 and `registry` (the wallet registry the bridge page's picker loads; default:
-the connectathon registry). Each result is logged as
+the connectathon registry). The test finds the buttons by their Compose test
+tags, `browser-checkin` and `direct-checkin`, which show as resource ids. Each result is logged as
 `SHCVerifier: RESULT path=browser|direct ok=… ms=… chars=…`.
 
 The direct button's transcript origin follows spec

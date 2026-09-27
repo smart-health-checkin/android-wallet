@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="smart_page">#FF0B0F14</color>
+    <color name="smart_brand">#FF7CBBEA</color>
+    <!-- Lifted from #722772 so the petal reads on dark backgrounds, as on the site. -->
+    <color name="smart_logo_purple">#FFA04CA0</color>
+</resources>

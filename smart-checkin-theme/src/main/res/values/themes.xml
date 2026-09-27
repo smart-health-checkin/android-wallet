@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window theme for apps that draw with SmartTheme. values-night holds the
+     dark variant, so the window follows the system's dark setting before Compose starts. -->
+<resources>
+    <style name="Theme.SmartCheckin" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/smart_page</item>
+        <item name="android:colorPrimary">@color/smart_brand</item>
+        <item name="android:colorAccent">@color/smart_brand</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
