@@ -10,7 +10,7 @@
 //        android:apk-key-hash:, which the app decrypts with). From wallet 0.4.7 the
 //        consent heading (test tag consent-heading) must say "An app is asking…".
 // small: the app's bundled request, answered as the testing wallet's small patient.
-// large: the connectathon's L2 request (anything in USCDI), answered as the
+// large: the request of the connectathon's large-response scenario (anything in US Core), answered as the
 //        testing wallet's large patient.
 // repeat: two small check-ins through the browser in a row, in one app process.
 // mixed: browser, direct, browser, in one app process (direct needs the reference wallet).
@@ -30,7 +30,7 @@ const SEQUENCES: Record<string, string[]> = { repeat: ["small", "small"], mixed:
 const PKG = "org.smarthealthit.checkin.verifier";
 const APP_HEADLINE = "An app is asking for your health information";
 const REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json";
-const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/uscdi.json";
+const LARGE_REQUEST = "https://smart-health-checkin.org/connectathon/requests/uscdi.json";
 const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/platform-tools/adb`;
 const adb = (...a: string[]) => $`${ADB} -s ${SERIAL} ${a}`.quiet().nothrow();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -138,7 +138,7 @@ async function runCase(name: string): Promise<boolean> {
 
 async function runStep(name: string, fresh: boolean): Promise<boolean> {
   if (name === "direct") return runDirect(fresh);
-  const request = name === "large" ? JSON.stringify(await (await fetch(L2_REQUEST)).json()) : undefined;
+  const request = name === "large" ? JSON.stringify(await (await fetch(LARGE_REQUEST)).json()) : undefined;
   const extras = `--es registry ${REGISTRY}` + (request ? ` --es request '${request.replace(/'/g, "'\\''")}'` : "");
   await launch(fresh, extras);
   // Tabs already open (an earlier step's wallet tab stays open in Chrome) aren't this step's.

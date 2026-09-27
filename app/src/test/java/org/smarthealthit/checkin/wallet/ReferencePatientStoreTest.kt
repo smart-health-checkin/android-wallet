@@ -42,6 +42,7 @@ class ReferencePatientStoreTest {
             "allergies" to "AllergyIntolerance",
             "medications" to "MedicationRequest",
             "immunizations" to "Immunization",
+            "coverage" to "Coverage",
         )
         items.zip(resolutions).forEach { (item, resolution) ->
             assertEquals("${item.id} availability", WalletItemAvailability.Available, resolution.availability)
@@ -63,7 +64,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun coverageMatchesCarinOrUsCoreAndBringsThePayer() {
-        val coverage = items("insurance").first { it.id == "coverage" }
+        val coverage = items("records").first { it.id == "coverage" }
         val resolution = store.resolveItems(listOf(coverage)).single()
         assertEquals(listOf("Coverage"), resolution.candidates.map { it.resourceType })
         assertEquals(listOf("Coverage", "Organization"), types(bundleFor(coverage, resolution)))
@@ -71,7 +72,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun narrowedFamilyReturnsOnlyObservations() {
-        val item = items("o4-narrowed-family").single()
+        val item = items("observations").single()
         val resolution = store.resolveItems(listOf(item)).single()
         assertTrue(resolution.candidates.isNotEmpty())
         assertTrue(resolution.candidates.all { it.resourceType == "Observation" })
@@ -83,14 +84,14 @@ class ReferencePatientStoreTest {
         val qr = QuestionnaireResponseBuilder.build(phq2, emptyMap())
         assertEquals("https://smart-health-checkin.org/connectathon/Questionnaire/phq-2.json", qr.getString("questionnaire"))
 
-        val versioned = items("o2-versioned-canonical").single()
+        val versioned = items("form-versioned").single()
         val qr2 = QuestionnaireResponseBuilder.build(versioned, emptyMap())
         assertEquals("https://smart-health-checkin.org/connectathon/Questionnaire/phq-2.json|1", qr2.getString("questionnaire"))
     }
 
     @Test
     fun unknownSelectorKindIsUnsupportedWhileOtherItemsAreServed() {
-        val items = items("o12-unknown-selector")
+        val items = items("unknown-selector")
         val resolutions = store.resolveItems(items)
         assertEquals(WalletItemAvailability.Available, resolutions.first { it.itemId == "patient" }.availability)
         val mystery = resolutions.first { it.itemId == "mystery" }
@@ -100,7 +101,7 @@ class ReferencePatientStoreTest {
 
     @Test
     fun smartHealthCardIsMintedWhenTheItemPrefersIt() {
-        val item = items("o6-smart-health-card").single()
+        val item = items("health-card").single()
         val resolution = store.resolveItems(listOf(item)).single()
         assertEquals(WalletItemAvailability.Available, resolution.availability)
         val artifact = store.buildArtifact(item, resolution.candidates, emptyMap())
