@@ -3,9 +3,12 @@
 The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
 [MAINTAINING.md](https://github.com/smart-health-checkin/smart-health-checkin.github.io/blob/main/MAINTAINING.md) maps every repo, what triggers what, and how to release.
 
-- Test: `./gradlew :app:testDebugUnitTest --no-daemon`. Test tasks fetch the
-  spec's fixtures and conformance cases at the pinned tag first
+- Test: `./gradlew test -Pskip-matcher --no-daemon` (what CI runs). Test tasks
+  fetch the spec's fixtures and conformance cases at the pinned tag first
   (`scripts/fetch-spec.sh`, `SPEC_REF`; `SPEC_DIR=../spec` uses a local checkout).
+  `-Pskip-matcher` keeps the checked-in `app/src/main/assets/matcher.wasm`;
+  without it Gradle rebuilds the matcher from `app/matcher-rs/`, which needs
+  nightly Rust with the `wasm32-unknown-unknown` target and `wasm-opt`.
 - Conformance: `ConformanceTest` runs the spec's conformance cases
   (`request-json`, `request-cbor`, `transcript`, `wallet-response`). Credentials built
   for `wallet-response` land in `app/build/conformance-wallet/`, and CI checks
@@ -16,7 +19,7 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   warning is reported.
 - Names follow the spec: Verifier, Wallet, Holder. Not Responder, Requester,
   or RP.
-- Build: `./gradlew :app:assembleDebug --no-daemon`.
+- Build: `./gradlew :app:assembleDebug :verifier-app:assembleDebug -Pskip-matcher --no-daemon`.
 - **Releasing:** push tag `vX.Y.Z`; `android-release.yml` builds, signs,
   and attaches both APKs (the wallet and `verifier-app`). Links everywhere use `releases/latest/download/`, so
   nothing else needs updating. Never re-tag.
