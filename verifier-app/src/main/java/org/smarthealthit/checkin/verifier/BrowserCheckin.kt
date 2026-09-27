@@ -27,8 +27,8 @@ import java.security.MessageDigest
  *     `delegate_permission/common.use_as_origin`.
  *  3. Send the page the SMART request. The page answers `started`, runs the
  *     check-in like any web page (the phone's wallet or a web wallet), decrypts
- *     and validates the response, and sends it back in parts, since each channel
- *     message crosses Android IPC and is capped at about 1 MB.
+ *     and validates the response, and sends it back in parts, so a response of
+ *     any size crosses the channel.
  *  4. Reassemble the parts, check the hash, and hand the result to [onResult].
  *
  * Each check-in uses its own session: Chrome keeps one message channel per

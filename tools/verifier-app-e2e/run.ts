@@ -10,7 +10,7 @@
 //        android:apk-key-hash:, which the app decrypts with).
 // small: the app's bundled request, answered as the testing wallet's small patient.
 // large: the connectathon's L2 request (anything in USCDI), answered as the
-//        testing wallet's large patient (over 2 MB).
+//        testing wallet's large patient.
 // repeat: two small check-ins through the browser in a row, in one app process.
 // mixed: browser, direct, browser, in one app process (direct needs the reference wallet).
 // Needs: adb, Chrome on the device with a network connection, puppeteer-core

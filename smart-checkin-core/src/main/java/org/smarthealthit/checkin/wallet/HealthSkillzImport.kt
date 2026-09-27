@@ -775,7 +775,7 @@ object ReferencePatients {
 
     val labels = linkedMapOf(
         ARIA to "Aria Test",
-        LARGE to "Aria Test, large record (over 2 MB)",
+        LARGE to "Aria Test, large record",
     )
 
     fun assetPath(key: String): String = when (key) {

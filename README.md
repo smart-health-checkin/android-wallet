@@ -245,7 +245,8 @@ for offline inspection.
 
 The two test patients, the same as the connectathon's SMART Testing Wallet,
 are in `app/src/main/assets/reference-patients/`: `aria-test.json` and
-`large-record.json` (over 2 MB, for large responses).
+`large-record.json` (a large record, for the connectathon's larger-data
+scenarios).
 
 More demo data is bundled under `app/src/main/assets/demo-data/`:
 
@@ -271,32 +272,22 @@ real holder data source that implements `SmartHealthWalletStore`.
 | Consent UI and Questionnaire input controls | `smart-checkin-ui-compose` |
 | Manifest entries, debug bundle retention, demo assets | `app` |
 
-## Response size and delivery modes
+## Returning large responses
 
-How big a response can this wallet return through the Digital Credentials
-API? It depends on which of two delivery modes the request lives in — a
-private handshake inside `androidx.credentials`, not anything in the W3C,
-OpenID, or ISO specs. Measured on a Pixel 11 Pro XL / Android 17 / Chrome 151
-(full write-up: [`docs/research/10-android-response-size.md`](https://github.com/smart-health-checkin/spec/blob/main/docs/research/10-android-response-size.md) in the spec repo):
+Return the response with the three-argument
+`PendingIntentHandler.setGetCredentialResponse(intent, response, request)` from
+`androidx.credentials` 1.7 or later, as `HandlerActivity` does. When the caller
+offers it (current Chrome does), androidx hands a large response to the caller
+as a file rather than inside the result Intent, so responses of any size get
+through. The two-argument overload is deprecated and always uses the Intent;
+don't use it.
 
-| Mode | When | Ceiling |
-| --- | --- | --- |
-| Intent-extra ("legacy") | wallet uses the deprecated two-argument `PendingIntentHandler.setGetCredentialResponse`, **or** the caller offered no large-payload receiver (Chrome < 150, other callers) | result-Intent parcel of ~514 KB passes, ~522 KB is **silently dropped** (picker stays open, the Verifier's promise never settles); ≥ ~1 MB the wallet crashes in `finish()`. Budget ≈ 200,000 chars of `credentialJson`. |
-| Large-payload | androidx ≥ 1.7.0-alpha01, the three-argument overload (what `HandlerActivity` uses), and a caller that put `EXTRA_LARGE_PAYLOAD_RESULT_RECEIVER` in the request (Chrome ≥ 150) | bundles ≥ 200 KB go out of band as a file descriptor; no transport limit found up to 66.7 M chars. The next wall is the wallet's own heap: ≈ 20 MB of payload at the default 256 MB, ≈ 50 MB with `largeHeap`, failing cleanly with a Verifier-visible `NetworkError`. |
-
-**Detecting the mode in the app.** `ResponseDelivery.describe(request)` (in
-`smart-checkin-credential-manager`) reports whether the caller accepts large
-payloads — it looks for a `ResultReceiver` under
+The three-argument overload picks the path by itself, so a wallet needs
+nothing more. To see which path a request uses, `ResponseDelivery.describe(request)`
+(in `smart-checkin-credential-manager`) reports whether the caller offered the
+file path: a `ResultReceiver` under
 `androidx.credentials.provider.EXTRA_LARGE_PAYLOAD_RESULT_RECEIVER` in the
-request's option `requestData` — plus the process heap cap and a rough
-`budgetChars`. `HandlerActivity` logs it for every request
-(`SHCHandler: response delivery mode=…`). After
-`setGetCredentialResponse`, `ResponseDelivery.wentOutOfBand(intent)` says which
-way the response actually went. The sample takes no action on it yet; the
-point is that a wallet *can* know, before building the response, whether it
-is limited to about 520 KB or can send tens of MB, and could offer narrower
-selections or return a pointer (a SMART Health Link) instead of bytes.
+request's option `requestData`. `HandlerActivity` logs it for every request
+(`SHCHandler: response delivery mode=…`). After `setGetCredentialResponse`,
+`ResponseDelivery.wentOutOfBand(intent)` says which way the response went.
 
-Sweep it yourself with [`tools/payload-probe/`](tools/payload-probe/README.md).
-The `-Plarge-heap` build property requests the larger heap for those
-experiments; the default build does not.

@@ -138,11 +138,10 @@ class HandlerActivity : ComponentActivity() {
                 "originError=${originResolution.error}",
         )
 
-        // Which delivery mode this request lives in decides how much the wallet
-        // could safely return (~200 K chars on the Intent-extra path, tens of MB
-        // out of band). This sample only logs it; see ResponseDelivery.
+        // Whether the caller accepts a large response as a file. This sample
+        // only logs it; see ResponseDelivery.
         val delivery = ResponseDelivery.describe(req)
-        Log.i(TAG, "response delivery mode=${delivery.label} budgetChars=${delivery.budgetChars} heapMaxMB=${delivery.heapMaxMB}")
+        Log.i(TAG, "response delivery mode=${delivery.label} heapMaxMB=${delivery.heapMaxMB}")
 
         val mdocOption = req.credentialOptions
             .filterIsInstance<GetDigitalCredentialOption>()
@@ -435,10 +434,11 @@ class HandlerActivity : ComponentActivity() {
         val resultData = Intent()
         val response = GetCredentialResponse(DigitalCredential(walletResponse.credentialJson))
         // The three-argument overload lets androidx (>= 1.7.0-alpha01) hand a
-        // response over 200 KB to the caller through a ResultReceiver + file
+        // large response to the caller through a ResultReceiver + file
         // descriptor instead of the Binder-bound Intent extra, when the caller
-        // (Chrome) offered one. The two-argument overload is deprecated and
-        // always uses the Intent extra; PayloadProbe can force it for testing.
+        // (Chrome) offered one, so responses of any size get through. The
+        // two-argument overload is deprecated and always uses the Intent
+        // extra; PayloadProbe can force it for testing.
         val providerReq = providerRequest
         val legacyPath = PayloadProbe.forceLegacyPath(this) || providerReq == null
         if (legacyPath) {

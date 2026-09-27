@@ -34,15 +34,14 @@ lifecycleScope.launch {
 
 ### `ResponseDelivery`
 
-Tells a provider activity which delivery mode its request lives in.
+Tells a provider activity how its response will reach the caller.
 `ResponseDelivery.describe(request)` → `callerAcceptsLargePayloads` (the caller
-put a large-payload `ResultReceiver` in the request; Chrome ≥ 150 does),
-`heapMaxMB`, and a rough `budgetChars` (~200 K chars on the Intent-extra path,
-whose parcel limit of about 520 KB fails silently; tens of MB out of band).
+put a large-payload `ResultReceiver` in the request, so androidx can hand a
+large response over as a file) and `heapMaxMB`.
 `ResponseDelivery.wentOutOfBand(intent)` after `setGetCredentialResponse`.
-Always call the three-argument `PendingIntentHandler.setGetCredentialResponse(intent, response, request)`;
-the two-argument overload is deprecated and pins you to the Intent-extra path.
-See [Response size and delivery modes](../README.md#response-size-and-delivery-modes) in the root README.
+Always call the three-argument `PendingIntentHandler.setGetCredentialResponse(intent, response, request)`,
+so responses of any size get through; the two-argument overload is deprecated.
+See [Returning large responses](../README.md#returning-large-responses) in the root README.
 
 ## What registration carries
 
