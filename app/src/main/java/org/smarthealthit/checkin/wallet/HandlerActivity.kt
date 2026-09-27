@@ -191,7 +191,7 @@ class HandlerActivity : ComponentActivity() {
             requestCarrierDebug = parsed.itemsRequest.requestCarrierDebug,
         )
 
-        screenState = ScreenState.Loading("Loading request forms", "Fetching any questionnaires referenced by the verifier.")
+        screenState = ScreenState.Loading("Loading request forms", "Fetching any questionnaires the request refers to.")
         lifecycleScope.launch {
             val hydratedSmartJson = runCatching {
                 SmartQuestionnaireFetcher.hydrateQuestionnaireUrls(smartJson)
@@ -207,44 +207,15 @@ class HandlerActivity : ComponentActivity() {
 
     /**
      * What the consent screen shows as who is asking. A browser caller is its web
-     * origin. An app caller is named only by websites that pass the two-way Digital
-     * Asset Links check ([AppCallerIdentity]), which runs in the background while the
-     * rest of the request loads; the screen shows "Checking" until it finishes. This
+     * origin. An app caller is just "an app": Credential Manager gives only its
+     * package name and signing certificate, which the Technical details show. This
      * is display only: the session transcript keeps the `android:apk-key-hash:` origin.
      */
     private fun identifyCaller(callingAppInfo: CallingAppInfo, originResolution: OriginResolution) {
-        if (originResolution.source == "web-origin") {
-            callerIdentity = CallerIdentity.Website(originResolution.origin)
-            return
-        }
-        val packageName = callingAppInfo.packageName
-        callerIdentity = CallerIdentity.App(originResolution.origin, packageName, null, null, AppLinkStatus.Checking)
-        lifecycleScope.launch {
-            val local = withContext(Dispatchers.IO) {
-                AppCallerIdentity.readLocal(packageManager, packageName, callingAppInfo.signingInfoCompat)
-            }
-            fun identity(check: AppLinkStatus) = CallerIdentity.App(
-                protocolOrigin = originResolution.origin,
-                packageName = packageName,
-                appLabel = local.label,
-                installer = local.installer,
-                check = check,
-            )
-            callerIdentity = identity(AppLinkStatus.Checking)
-            val done = AppCallerIdentity.check(local)
-            callerIdentity = identity(done)
-            appendToDebugBundle(
-                "caller-identity.json",
-                JSONObject()
-                    .put("packageName", packageName)
-                    .put("appLabel", local.label ?: JSONObject.NULL)
-                    .put("installer", local.installer ?: JSONObject.NULL)
-                    .put("certFingerprints", JSONArray(local.certFingerprints))
-                    .put("declaredSites", JSONArray(done.declaredSites))
-                    .put("verifiedSites", JSONArray(done.verifiedSites))
-                    .put("results", JSONArray(done.results))
-                    .toString(2),
-            )
+        callerIdentity = if (originResolution.source == "web-origin") {
+            CallerIdentity.Website(originResolution.origin)
+        } else {
+            CallerIdentity.App(originResolution.origin, callingAppInfo.packageName)
         }
     }
 

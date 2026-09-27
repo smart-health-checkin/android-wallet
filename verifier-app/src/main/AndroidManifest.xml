@@ -13,13 +13,6 @@
         android:icon="@mipmap/ic_launcher"
         android:label="SMART Check-in Verifier"
         android:theme="@style/Theme.SmartCheckin">
-        <!-- The website this app belongs to. A wallet that is asked by this app reads this
-             declaration, fetches https://smart-health-checkin.org/.well-known/assetlinks.json,
-             and names the app by the site only if that file lists this package and signing key
-             back. Both directions have to match. -->
-        <meta-data
-            android:name="asset_statements"
-            android:resource="@string/asset_statements" />
         <activity
             android:name=".VerifierActivity"
             android:exported="true"

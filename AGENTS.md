@@ -42,8 +42,9 @@ The reference Android wallet. Released as an APK from `vX.Y.Z` tags.
   `smart-health-checkin-verifier.apk`.
 - App callers' origin is `android:apk-key-hash:<base64url SHA-256 of the signing
   cert>` ([spec TR-2](https://smart-health-checkin.org/spec/#TR-2)); browser callers' origin comes from `getOrigin` with the
-  privileged-caller allowlist. That origin is for the transcript only: the consent
-  screen names an app caller by websites that pass the two-way Digital Asset Links
-  check (`AssetLinks.kt`, `AppCallerIdentity.kt`), never by package name or label.
-  `verifier-app` declares smart-health-checkin.org in `asset_statements`, and the
-  e2e `direct` case checks the wallet's headline names it.
+  privileged-caller allowlist. That origin is for the transcript only. The consent
+  screen says "A website is asking for your health information" with the origin for
+  a browser caller, and "An app is asking for your health information" for an app
+  caller, never naming the app (its package name and origin are under Technical
+  details) and never calling the requester a practice or clinic. The e2e `direct`
+  case checks that heading (test tag `consent-heading`).

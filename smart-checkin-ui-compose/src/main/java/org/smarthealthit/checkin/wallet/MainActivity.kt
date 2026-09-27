@@ -84,9 +84,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -1213,7 +1210,7 @@ fun DemoApp(
             is ScreenState.Loading -> LoadingScreen(state, padding)
             is ScreenState.Submitting -> SubmittingScreen(state, padding)
             is ScreenState.Error -> ErrorScreen(state, padding, onClose)
-            is ScreenState.Complete -> CompleteScreen(padding)
+            is ScreenState.Complete -> CompleteScreen(padding, caller)
             is ScreenState.Consent -> ConsentScreen(
                 request = state.request,
                 caller = caller,
@@ -1318,7 +1315,7 @@ private fun ErrorScreen(state: ScreenState.Error, padding: PaddingValues, onClos
 }
 
 @Composable
-private fun CompleteScreen(padding: PaddingValues) {
+private fun CompleteScreen(padding: PaddingValues, caller: CallerIdentity?) {
     CenterPanel(padding) {
         StatusDot(AppColors.Success, AppColors.SuccessSoft)
         Spacer(Modifier.height(20.dp))
@@ -1331,7 +1328,8 @@ private fun CompleteScreen(padding: PaddingValues) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "The data you selected was encrypted and sent to the verifier.",
+            text = "The data you selected was encrypted and sent to ${recipientPhrase(caller)}.",
+            modifier = Modifier.testTag("complete-message"),
             style = MaterialTheme.typography.bodyLarge,
             color = AppColors.Muted,
         )
@@ -1409,7 +1407,7 @@ private fun ConsentScreen(
                         onAnswerChanged = onAnswerChanged,
                     )
                 } else {
-                    NoticeCard("This questionnaire was referenced by URL. Inline rendering requires the verifier to include the Questionnaire resource.")
+                    NoticeCard("This questionnaire was referenced by URL. Inline rendering requires the request to include the Questionnaire resource.")
                 }
             }
         }
@@ -1418,14 +1416,31 @@ private fun ConsentScreen(
     }
 }
 
+/**
+ * Who is asking, in words that claim only what the wallet knows: a website (its
+ * origin is shown below the heading) or an app. Never a practice, clinic, or
+ * provider: nothing in the request proves that. An app caller isn't named at all;
+ * see [CallerIdentity].
+ */
+fun requesterPhrase(caller: CallerIdentity?): String = when (caller) {
+    is CallerIdentity.App -> "An app"
+    else -> "A website"
+}
+
+/** The recipient on the success screen: the website's origin, or "the app". */
+fun recipientPhrase(caller: CallerIdentity?): String = when (caller) {
+    is CallerIdentity.Website -> caller.origin
+    is CallerIdentity.App -> "the app"
+    null -> "the website that asked"
+}
+
 @Composable
 private fun HeaderCard(request: VerifiedRequest, caller: CallerIdentity?) {
     val app = caller as? CallerIdentity.App
-    val check = app?.check as? AppLinkStatus.Done
     ElevatedPanel {
         Text(
-            text = "A practice is asking for your health information",
-            modifier = Modifier.semantics { heading() },
+            text = "${requesterPhrase(caller ?: CallerIdentity.Website(request.verifierOrigin))} is asking for your health information",
+            modifier = Modifier.semantics { heading() }.testTag("consent-heading"),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
@@ -1433,13 +1448,13 @@ private fun HeaderCard(request: VerifiedRequest, caller: CallerIdentity?) {
         Spacer(Modifier.height(8.dp))
         val readerAuthText = when {
             request.readerAuth.present && request.readerAuth.signatureValid ->
-                "The verifier signed this request with readerAuth; review the requested data before sharing."
+                "The request is signed (readerAuth); review the requested data before sharing."
             request.readerAuth.present ->
-                "The verifier sent readerAuth, but its signature did not verify. Review carefully before sharing."
-            app == null || (check != null && check.verifiedSites.isNotEmpty()) ->
+                "The request carries a readerAuth signature that did not verify. Review carefully before sharing."
+            app == null ->
                 "Check that you recognize the website below before sharing."
             else ->
-                "Check who is asking below before sharing."
+                "The wallet can't tell which organization this app belongs to."
         }
         Text(
             text = readerAuthText,
@@ -1452,26 +1467,17 @@ private fun HeaderCard(request: VerifiedRequest, caller: CallerIdentity?) {
         if (app == null) {
             VerifierStrip(request.verifierOrigin, request.readerAuth)
         } else {
-            AppCallerStrip(app, request.readerAuth)
+            AppCallerStrip(request.readerAuth)
         }
     }
 }
 
-/** "a", "a and b", "a, b, and c". */
-private fun joinSites(sites: List<String>): String = when (sites.size) {
-    0 -> ""
-    1 -> sites[0]
-    2 -> "${sites[0]} and ${sites[1]}"
-    else -> sites.dropLast(1).joinToString(", ") + ", and " + sites.last()
-}
-
 /**
- * An app caller, named only by the websites that vouch for it (the two-way
- * Digital Asset Links check). Its package name and label are its own choice, so
- * they appear only under Technical details.
+ * An app caller. The wallet doesn't name it: its package name and label are the
+ * app's own choice, so they appear only under Technical details.
  */
 @Composable
-private fun AppCallerStrip(app: CallerIdentity.App, readerAuth: ReaderAuthVerification) {
+private fun AppCallerStrip(readerAuth: ReaderAuthVerification) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1481,54 +1487,26 @@ private fun AppCallerStrip(app: CallerIdentity.App, readerAuth: ReaderAuthVerifi
             .padding(12.dp),
     ) {
         Text(
-            text = "Verifier",
+            text = "App",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Muted,
         )
         Spacer(Modifier.height(4.dp))
-        when (val check = app.check) {
-            is AppLinkStatus.Checking -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = AppColors.Primary)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Checking…",
-                    modifier = Modifier.testTag("caller-headline"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.Muted,
-                )
-            }
-            is AppLinkStatus.Done -> {
-                val verified = check.verifiedSites.map { it.removePrefix("https://") }
-                val headline = buildAnnotatedString {
-                    when {
-                        verified.isNotEmpty() -> {
-                            append("An app linked to ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(joinSites(verified)) }
-                            append(" is asking")
-                        }
-                        check.declaredSites.isEmpty() -> append("An app that isn't linked to any website is asking")
-                        else -> append("An app linked to no verified website is asking")
-                    }
-                }
-                Text(
-                    text = headline,
-                    modifier = Modifier.testTag("caller-headline"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.Ink,
-                )
-                if (verified.isEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Share only if you opened this from an app you trust.",
-                        modifier = Modifier.testTag("caller-caution"),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AppColors.Amber,
-                    )
-                }
-            }
-        }
+        Text(
+            text = "An app on this phone, not a website",
+            modifier = Modifier.testTag("caller-headline"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppColors.Ink,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Share only if you opened this from an app you trust.",
+            modifier = Modifier.testTag("caller-caution"),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = AppColors.Amber,
+        )
         if (readerAuth.present && readerAuth.certificateSubject != null) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -1553,7 +1531,7 @@ private fun VerifierStrip(verifierOrigin: String, readerAuth: ReaderAuthVerifica
             .padding(12.dp),
     ) {
         Text(
-            text = "Verifier",
+            text = "Website",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = AppColors.Muted,
@@ -1561,9 +1539,11 @@ private fun VerifierStrip(verifierOrigin: String, readerAuth: ReaderAuthVerifica
         Spacer(Modifier.height(4.dp))
         Text(
             text = verifierOrigin,
-            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag("caller-origin"),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
             color = AppColors.Ink,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (readerAuth.present && readerAuth.certificateSubject != null) {
@@ -2703,7 +2683,7 @@ private fun TechnicalSummary(request: VerifiedRequest, app: CallerIdentity.App?)
             text = if (app == null) {
                 "Optional raw request details for debugging and test captures."
             } else {
-                "What the calling app says about itself, the website check, and the raw request."
+                "The calling app's package name and origin, and the raw request."
             },
             style = MaterialTheme.typography.bodySmall,
             color = AppColors.Muted,
@@ -2718,17 +2698,8 @@ private fun TechnicalSummary(request: VerifiedRequest, app: CallerIdentity.App?)
                     color = AppColors.Muted,
                 )
                 Spacer(Modifier.height(6.dp))
-                DebugLine("package", app.packageName)
-                DebugLine("app's own name", (app.appLabel ?: "unknown") + " (chosen by the app, not verified)")
-                DebugLine("installed by", app.installer ?: "unknown")
+                DebugLine("package", app.packageName + " (chosen by the app, not verified)")
                 DebugLine("origin", app.protocolOrigin)
-                when (val check = app.check) {
-                    is AppLinkStatus.Checking -> DebugLine("websites", "checking…")
-                    is AppLinkStatus.Done -> {
-                        DebugLine("declared sites", check.declaredSites.ifEmpty { listOf("none") }.joinToString(", "))
-                        check.results.forEach { DebugLine("website check", it) }
-                    }
-                }
                 Spacer(Modifier.height(4.dp))
             }
             Spacer(Modifier.height(12.dp))

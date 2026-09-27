@@ -7,8 +7,8 @@
 //
 // direct: the app's second button, Credential Manager with no browser, answered by
 //        the reference Android wallet (v0.4.0 or later: it binds app callers to
-//        android:apk-key-hash:, which the app decrypts with). From wallet 0.4.6 the
-//        consent screen must name the app by smart-health-checkin.org.
+//        android:apk-key-hash:, which the app decrypts with). From wallet 0.4.7 the
+//        consent heading (test tag consent-heading) must say "An app is asking…".
 // small: the app's bundled request, answered as the testing wallet's small patient.
 // large: the connectathon's L2 request (anything in USCDI), answered as the
 //        testing wallet's large patient.
@@ -28,7 +28,7 @@ const CASES = args.length ? args : ["direct", "small", "large", "repeat", "mixed
 /** Cases that run several steps without restarting the app between them. */
 const SEQUENCES: Record<string, string[]> = { repeat: ["small", "small"], mixed: ["small", "direct", "small"] };
 const PKG = "org.smarthealthit.checkin.verifier";
-const VERIFIED_HEADLINE = "An app linked to smart-health-checkin.org is asking";
+const APP_HEADLINE = "An app is asking for your health information";
 const REGISTRY = "https://smart-health-checkin.org/connectathon/wallets.json";
 const L2_REQUEST = "https://smart-health-checkin.org/connectathon/requests/baseline-4.json";
 const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/platform-tools/adb`;
@@ -107,17 +107,14 @@ async function runDirect(fresh = true): Promise<boolean> {
     const log = (await adb("logcat", "-d", "-s", "SHCVerifier:I")).stdout.toString();
     const result = log.match(/RESULT path=direct (.*)/)?.[1];
     if (result) {
-      // Wallets from 0.4.6 name an app caller by the website that vouches for it
-      // (Digital Asset Links); this app is listed at smart-health-checkin.org.
-      const named = headline === undefined || headline === VERIFIED_HEADLINE;
+      // Wallets from 0.4.7 say only that an app is asking; they don't name app callers.
+      const named = headline === undefined || headline === APP_HEADLINE;
       const ok = /ok=true/.test(result) && named;
       console.log(`${ok ? "ok  " : "FAIL"} direct: ${((Date.now() - t0) / 1000).toFixed(1)} s total; ` +
-        `wallet said "${headline ?? "(no caller-headline; wallet before 0.4.6)"}"; app: ${result}`);
+        `wallet said "${headline ?? "(no consent-heading; wallet before 0.4.7)"}"; app: ${result}`);
       return ok;
     }
-    // Wait out the wallet's brief "Checking…" before reading who it says is asking.
-    const shown = (await screen()).find((n) => n.id === "caller-headline")?.text;
-    if (shown === "Checking…") continue;
+    const shown = (await screen()).find((n) => n.id === "consent-heading")?.text;
     if (shown) headline = shown;
     // The wallet's share button first (its test tag, or its label in wallets before 0.4.5),
     // then the system sheet's buttons.
